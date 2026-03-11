@@ -131,7 +131,7 @@ export default async function ProfilePage({
         </section>
 
         <footer className="mt-auto pt-16 flex flex-col items-center gap-3">
-          <SocialLinks links={userSocials} />
+          <SocialLinks links={userSocials} size={cardSize} />
           <p className="text-xs text-black/15 dark:text-white/15 select-none">
             Built with <span className="text-black/25 dark:text-white/25">Next.js</span>
           </p>
