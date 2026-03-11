@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import Image from "next/image";
+import { useClerk } from "@clerk/nextjs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { LinksData, Link, SocialLink } from "@/data/links";
 
@@ -15,19 +16,26 @@ export function AdminClient() {
   const [data, setData] = useState<LinksData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
+  const { signOut } = useClerk();
 
   useEffect(() => {
-    fetch("/api/data").then((r) => r.json()).then(setData);
+    fetch("/api/data").then((r) => r.json()).then((d) => {
+      setData(d);
+      if (d.profile?.username) setUsername(d.profile.username);
+    });
   }, []);
 
   const save = useCallback(async (next: LinksData) => {
     setSaving(true);
     setSaved(false);
-    await fetch("/api/data", {
+    const res = await fetch("/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(next),
     });
+    const json = await res.json();
+    if (json.username) setUsername(json.username);
     setSaving(false);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -132,10 +140,11 @@ export function AdminClient() {
       <header className="relative border-b border-black/8 dark:border-white/8 bg-white/80 dark:bg-black/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 h-12">
           <div className="flex items-center gap-3">
-            <a href="/" className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors">
-              ← Live page
-            </a>
-            <span className="text-black/10 dark:text-white/10">|</span>
+            {username && (
+              <a href={`/${username}`} target="_blank" className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors">
+                ← Live page
+              </a>
+            )}
             <span className="text-xs font-medium text-black/70 dark:text-white/70">CMS</span>
           </div>
           <div className="flex items-center gap-2">
@@ -143,11 +152,17 @@ export function AdminClient() {
               Saved
             </span>
             <button
-              onClick={() => save(data)}
+              onClick={() => save(data!)}
               disabled={saving}
               className="flex h-7 items-center gap-1.5 rounded-md bg-black px-3 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-40 dark:bg-white dark:text-black"
             >
               {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={() => signOut({ redirectUrl: "/" })}
+              className="flex h-7 items-center rounded-md border border-black/10 dark:border-white/10 px-3 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+            >
+              Sign out
             </button>
             <ThemeToggle />
           </div>

@@ -1,0 +1,84 @@
+import { notFound } from "next/navigation";
+import { db } from "@/db";
+import { profiles, links, socialLinks } from "@/db/schema";
+import { eq, asc } from "drizzle-orm";
+import { Avatar } from "@/components/Avatar";
+import { LinkCard } from "@/components/LinkCard";
+import { SocialLinks } from "@/components/SocialLinks";
+import { ThemeToggle } from "@/components/ThemeToggle";
+
+export const dynamic = "force-dynamic";
+
+export default async function ProfilePage({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}) {
+  const { username } = await params;
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.username, username.toLowerCase()),
+  });
+
+  if (!profile) notFound();
+
+  const [userLinks, userSocials] = await Promise.all([
+    db.select().from(links).where(eq(links.profileId, profile.id)).orderBy(asc(links.position)),
+    db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
+  ]);
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-black transition-colors duration-200">
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+      <div
+        className="fixed inset-0 pointer-events-none dark:block hidden"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+
+      <div className="fixed top-4 right-4"><ThemeToggle /></div>
+
+      <main className="relative mx-auto flex min-h-screen max-w-md flex-col items-center px-4 py-16">
+        <section className="animate-fade-in-up mb-8 flex flex-col items-center gap-4 text-center">
+          <Avatar initials={profile.avatarInitials} avatarUrl={profile.avatarUrl || undefined} size={80} />
+          <div>
+            <h1 className="text-lg font-semibold text-black dark:text-white tracking-tight">
+              {profile.name}
+            </h1>
+            <p className="text-sm text-black/40 dark:text-white/40 mt-0.5">@{profile.username}</p>
+          </div>
+          {profile.bio && (
+            <p className="max-w-xs text-sm leading-relaxed text-black/60 dark:text-white/60">
+              {profile.bio}
+            </p>
+          )}
+        </section>
+
+        <div className="mb-6 h-px w-full bg-black/5 dark:bg-white/5" />
+
+        <section className="w-full flex flex-col gap-2.5">
+          {userLinks.map((link, i) => (
+            <LinkCard key={link.id} link={link} index={i} />
+          ))}
+        </section>
+
+        <footer className="mt-auto pt-16 flex flex-col items-center gap-3">
+          <SocialLinks links={userSocials} />
+          <p className="text-xs text-black/15 dark:text-white/15 select-none">
+            Built with <span className="text-black/25 dark:text-white/25">Next.js</span>
+          </p>
+        </footer>
+      </main>
+    </div>
+  );
+}

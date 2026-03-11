@@ -1,30 +1,28 @@
 import { NextResponse } from "next/server";
-import { writeFileSync, readFileSync } from "fs";
-import { join, extname } from "path";
-import type { LinksData } from "@/data/links";
-
-const DATA_PATH = join(process.cwd(), "src/data/links.json");
+import { auth } from "@clerk/nextjs/server";
+import { put } from "@vercel/blob";
+import { db } from "@/db";
+import { profiles } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function POST(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
+  if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
 
-  if (!file) {
-    return NextResponse.json({ error: "No file" }, { status: 400 });
-  }
+  const ext = file.name.split(".").pop() ?? "jpg";
+  const blob = await put(`avatars/${userId}.${ext}`, file, {
+    access: "public",
+    allowOverwrite: true,
+  });
 
-  const ext = extname(file.name).toLowerCase() || ".jpg";
-  const filename = `avatar${ext}`;
-  const destPath = join(process.cwd(), "public/uploads", filename);
+  // Persist to profile if it exists
+  await db.update(profiles)
+    .set({ avatarUrl: blob.url })
+    .where(eq(profiles.userId, userId));
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  writeFileSync(destPath, buffer);
-
-  // Update avatarUrl in links.json
-  const url = `/uploads/${filename}?v=${Date.now()}`;
-  const data: LinksData = JSON.parse(readFileSync(DATA_PATH, "utf-8"));
-  data.profile.avatarUrl = url;
-  writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
-
-  return NextResponse.json({ url });
+  return NextResponse.json({ url: blob.url });
 }

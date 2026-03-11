@@ -1,24 +1,118 @@
 import { NextResponse } from "next/server";
-import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
-import type { LinksData } from "@/data/links";
-
-const DATA_PATH = join(process.cwd(), "src/data/links.json");
-
-function readData(): LinksData {
-  return JSON.parse(readFileSync(DATA_PATH, "utf-8"));
-}
-
-function writeData(data: LinksData) {
-  writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
-}
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { profiles, links, socialLinks } from "@/db/schema";
+import { eq, asc } from "drizzle-orm";
 
 export async function GET() {
-  return NextResponse.json(readData());
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.userId, userId),
+  });
+
+  if (!profile) {
+    return NextResponse.json({
+      profile: { name: "", username: "", bio: "", avatarInitials: "", avatarUrl: "" },
+      links: [],
+      socialLinks: [],
+    });
+  }
+
+  const [userLinks, userSocials] = await Promise.all([
+    db.select().from(links).where(eq(links.profileId, profile.id)).orderBy(asc(links.position)),
+    db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
+  ]);
+
+  return NextResponse.json({
+    profile: {
+      name: profile.name,
+      username: profile.username,
+      bio: profile.bio,
+      avatarInitials: profile.avatarInitials,
+      avatarUrl: profile.avatarUrl,
+    },
+    links: userLinks.map((l) => ({
+      id: l.id,
+      title: l.title,
+      description: l.description,
+      url: l.url,
+      icon: l.icon,
+    })),
+    socialLinks: userSocials.map((s) => ({
+      platform: s.platform,
+      url: s.url,
+      icon: s.icon,
+    })),
+  });
 }
 
 export async function POST(req: Request) {
-  const body: LinksData = await req.json();
-  writeData(body);
-  return NextResponse.json({ ok: true });
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { profile: profileData, links: linksData, socialLinks: socialsData } = body;
+
+  // Upsert profile
+  let profile = await db.query.profiles.findFirst({
+    where: eq(profiles.userId, userId),
+  });
+
+  if (!profile) {
+    const [created] = await db.insert(profiles).values({
+      userId,
+      username: profileData.username?.toLowerCase().replace(/[^a-z0-9_-]/g, "") || userId.slice(0, 12),
+      name: profileData.name,
+      bio: profileData.bio,
+      avatarInitials: profileData.avatarInitials,
+      avatarUrl: profileData.avatarUrl || "",
+    }).returning();
+    profile = created;
+  } else {
+    const [updated] = await db.update(profiles)
+      .set({
+        username: profileData.username?.toLowerCase().replace(/[^a-z0-9_-]/g, "") || profile.username,
+        name: profileData.name,
+        bio: profileData.bio,
+        avatarInitials: profileData.avatarInitials,
+        avatarUrl: profileData.avatarUrl || "",
+      })
+      .where(eq(profiles.userId, userId))
+      .returning();
+    profile = updated;
+  }
+
+  // Replace links
+  await db.delete(links).where(eq(links.profileId, profile.id));
+  if (linksData.length > 0) {
+    await db.insert(links).values(
+      linksData.map((l: { id: string; title: string; description: string; url: string; icon: string }, i: number) => ({
+        id: l.id,
+        profileId: profile!.id,
+        title: l.title,
+        description: l.description || "",
+        url: l.url,
+        icon: l.icon || "globe",
+        position: i,
+      }))
+    );
+  }
+
+  // Replace social links
+  await db.delete(socialLinks).where(eq(socialLinks.profileId, profile.id));
+  if (socialsData.length > 0) {
+    await db.insert(socialLinks).values(
+      socialsData.map((s: { platform: string; url: string; icon: string }, i: number) => ({
+        profileId: profile!.id,
+        platform: s.platform,
+        url: s.url,
+        icon: s.icon,
+        position: i,
+      }))
+    );
+  }
+
+  return NextResponse.json({ ok: true, username: profile.username });
 }
