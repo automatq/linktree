@@ -81,7 +81,7 @@ export default async function ProfilePage({
         }}
       />
 
-      <div className="fixed top-4 right-4 flex items-center gap-2">
+      <div className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] flex items-center gap-2">
         {isOwner && (
           <Link
             href="/admin"
