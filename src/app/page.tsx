@@ -5,6 +5,7 @@ import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { TriTree } from "@/components/TriTree";
 
 export const dynamic = "force-dynamic";
 
@@ -30,13 +31,16 @@ export default async function Home() {
         }}
       />
       <div className="fixed top-4 right-4"><ThemeToggle /></div>
-      <main className="relative mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-4 gap-6 text-center">
-        <h1 className="text-2xl font-semibold text-black dark:text-white tracking-tight">
-          TriLink
-        </h1>
-        <p className="text-sm text-black/50 dark:text-white/50 max-w-xs">
-          All your links in one place. Create your free profile.
-        </p>
+      <main className="relative mx-auto flex min-h-screen max-w-md flex-col items-center justify-center px-4 gap-5 text-center">
+        <TriTree />
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-semibold text-black dark:text-white tracking-tight">
+            TriLink
+          </h1>
+          <p className="text-sm text-black/50 dark:text-white/50 max-w-xs">
+            All your links in one place. Create your free profile.
+          </p>
+        </div>
         <div className="flex gap-3">
           <Link
             href="/sign-up"
