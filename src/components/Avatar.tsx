@@ -7,6 +7,8 @@ type AvatarProps = {
 };
 
 export function Avatar({ initials, avatarUrl, size = 80 }: AvatarProps) {
+  const isGif = avatarUrl?.toLowerCase().includes(".gif");
+
   return (
     <div
       style={{ width: size, height: size, fontSize: size * 0.35 }}
@@ -19,6 +21,7 @@ export function Avatar({ initials, avatarUrl, size = 80 }: AvatarProps) {
           fill
           className="object-cover"
           sizes={`${size}px`}
+          unoptimized={isGif}
         />
       ) : (
         initials

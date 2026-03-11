@@ -41,6 +41,20 @@ export default async function ProfilePage({
   const cardStyle = (profile.cardStyle ?? "minimal") as CardStyle;
   const cardSize = (profile.cardSize ?? "md") as CardSize;
 
+  const profileScale: Record<CardSize, {
+    avatarSize: number;
+    gap: string;
+    name: string;
+    username: string;
+    bio: string;
+  }> = {
+    sm:  { avatarSize: 56,  gap: "gap-3", name: "text-base",  username: "text-xs",  bio: "text-xs"  },
+    md:  { avatarSize: 80,  gap: "gap-4", name: "text-lg",    username: "text-sm",  bio: "text-sm"  },
+    lg:  { avatarSize: 104, gap: "gap-5", name: "text-xl",    username: "text-sm",  bio: "text-sm"  },
+    xl:  { avatarSize: 132, gap: "gap-6", name: "text-2xl",   username: "text-base",bio: "text-base" },
+  };
+  const ps = profileScale[cardSize];
+
   const fontMap: Record<string, string> = {
     mono: "var(--font-geist-mono), monospace",
     sans: "var(--font-geist-sans), sans-serif",
@@ -84,16 +98,16 @@ export default async function ProfilePage({
       </div>
 
       <main className="relative mx-auto flex min-h-screen max-w-md flex-col items-center px-4 py-16">
-        <section className="animate-fade-in-up mb-8 flex flex-col items-center gap-4 text-center">
-          <Avatar initials={profile.avatarInitials} avatarUrl={profile.avatarUrl || undefined} size={80} />
+        <section className={`animate-fade-in-up mb-8 flex flex-col items-center ${ps.gap} text-center`}>
+          <Avatar initials={profile.avatarInitials} avatarUrl={profile.avatarUrl || undefined} size={ps.avatarSize} />
           <div>
-            <h1 className="text-lg font-semibold text-black dark:text-white tracking-tight">
+            <h1 className={`${ps.name} font-semibold text-black dark:text-white tracking-tight`}>
               {profile.name}
             </h1>
-            <p className="text-sm text-black/40 dark:text-white/40 mt-0.5">@{profile.username}</p>
+            <p className={`${ps.username} text-black/40 dark:text-white/40 mt-0.5`}>@{profile.username}</p>
           </div>
           {profile.bio && (
-            <p className="max-w-xs text-sm leading-relaxed text-black/60 dark:text-white/60">
+            <p className={`max-w-xs ${ps.bio} leading-relaxed text-black/60 dark:text-white/60`}>
               {profile.bio}
             </p>
           )}

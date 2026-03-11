@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import Image from "next/image";
 import { useClerk } from "@clerk/nextjs";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { LinksData, Link, SocialLink } from "@/data/links";
@@ -664,7 +663,8 @@ function AvatarUpload({
       >
         <div className="w-16 h-16 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-semibold text-xl ring-1 ring-black/10 dark:ring-white/10 overflow-hidden select-none relative">
           {preview ? (
-            <Image src={preview} alt="Avatar" fill className="object-cover" sizes="64px" />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={preview} alt="Avatar" className="absolute inset-0 w-full h-full object-cover" />
           ) : (
             initials
           )}
