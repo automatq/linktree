@@ -8,10 +8,15 @@ type LinkCardProps = {
   index: number;
 };
 
+function ensureAbsolute(url: string) {
+  if (!url || url === "#") return url;
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
 export function LinkCard({ link, index }: LinkCardProps) {
   return (
     <a
-      href={link.url}
+      href={ensureAbsolute(link.url)}
       target="_blank"
       rel="noopener noreferrer"
       className="animate-fade-in-up group flex items-center gap-4 rounded-xl border border-black/8 bg-black/[0.03] px-5 py-4 transition-all duration-200 hover:border-black/20 hover:bg-black/[0.06] active:scale-[0.99] dark:border-white/10 dark:bg-white/[0.03] dark:hover:border-white/25 dark:hover:bg-white/[0.07]"
