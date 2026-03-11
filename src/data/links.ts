@@ -20,6 +20,7 @@ export type Profile = {
   avatarUrl?: string;
   font?: string;
   cardStyle?: string;
+  cardSize?: string;
 };
 
 export type LinksData = {

@@ -244,6 +244,11 @@ export function AdminClient() {
               <StylePicker value={data.profile.cardStyle ?? "minimal"} onChange={(v) => updateProfile("cardStyle", v)} />
             </Section>
 
+            {/* Card Size section */}
+            <Section title="Card Size">
+              <SizePicker value={data.profile.cardSize ?? "md"} onChange={(v) => updateProfile("cardSize", v)} />
+            </Section>
+
             {/* Links section */}
             <Section
               title="Links"
@@ -795,6 +800,85 @@ function StylePicker({ value, onChange }: { value: string; onChange: (v: string)
   return (
     <div className="grid grid-cols-5 gap-2">
       {CARD_STYLE_OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`flex flex-col gap-2 p-2 rounded-lg border transition-colors ${
+              active
+                ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
+                : "border-black/8 dark:border-white/8 hover:border-black/20 dark:hover:border-white/20"
+            }`}
+          >
+            {opt.preview}
+            <span className={`text-[11px] text-center ${active ? "text-black dark:text-white font-medium" : "text-black/40 dark:text-white/40"}`}>
+              {opt.label}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Size Picker ──────────────────────────────────────────────────────────────
+
+const CARD_SIZE_OPTIONS = [
+  {
+    value: "sm",
+    label: "Small",
+    preview: (
+      <div className="w-full flex items-center justify-center py-1">
+        <div className="w-full h-6 rounded-md border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] flex items-center px-1.5 gap-1">
+          <div className="w-2.5 h-2.5 rounded bg-black/10 dark:bg-white/10 shrink-0" />
+          <div className="flex-1 h-1 rounded bg-black/10 dark:bg-white/10" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    value: "md",
+    label: "Regular",
+    preview: (
+      <div className="w-full flex items-center justify-center">
+        <div className="w-full h-8 rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] flex items-center px-2 gap-1.5">
+          <div className="w-3.5 h-3.5 rounded bg-black/10 dark:bg-white/10 shrink-0" />
+          <div className="flex-1 h-1.5 rounded bg-black/10 dark:bg-white/10" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    value: "lg",
+    label: "Large",
+    preview: (
+      <div className="w-full flex items-center justify-center">
+        <div className="w-full h-11 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] flex items-center px-2.5 gap-2">
+          <div className="w-5 h-5 rounded bg-black/10 dark:bg-white/10 shrink-0" />
+          <div className="flex-1 h-1.5 rounded bg-black/10 dark:bg-white/10" />
+        </div>
+      </div>
+    ),
+  },
+  {
+    value: "xl",
+    label: "XL",
+    preview: (
+      <div className="w-full flex items-center justify-center">
+        <div className="w-full h-14 rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] flex items-center px-3 gap-2.5">
+          <div className="w-6 h-6 rounded bg-black/10 dark:bg-white/10 shrink-0" />
+          <div className="flex-1 h-2 rounded bg-black/10 dark:bg-white/10" />
+        </div>
+      </div>
+    ),
+  },
+];
+
+function SizePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="grid grid-cols-4 gap-2">
+      {CARD_SIZE_OPTIONS.map((opt) => {
         const active = value === opt.value;
         return (
           <button

@@ -34,6 +34,7 @@ export async function GET() {
       avatarUrl: profile.avatarUrl,
       font: profile.font,
       cardStyle: profile.cardStyle,
+      cardSize: profile.cardSize,
     },
     links: userLinks.map((l) => ({
       id: l.id,
@@ -72,6 +73,7 @@ export async function POST(req: Request) {
       avatarUrl: profileData.avatarUrl || "",
       font: profileData.font || "mono",
       cardStyle: profileData.cardStyle || "minimal",
+      cardSize: profileData.cardSize || "md",
     }).returning();
     profile = created;
   } else {
@@ -84,6 +86,7 @@ export async function POST(req: Request) {
         avatarUrl: profileData.avatarUrl || "",
         font: profileData.font || "mono",
         cardStyle: profileData.cardStyle || "minimal",
+        cardSize: profileData.cardSize || "md",
       })
       .where(eq(profiles.userId, userId))
       .returning();

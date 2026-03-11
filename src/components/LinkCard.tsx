@@ -4,6 +4,7 @@ import { Icon, ArrowRightIcon } from "./Icons";
 import type { Link } from "@/data/links";
 
 export type CardStyle = "minimal" | "solid" | "ghost" | "lift" | "sharp";
+export type CardSize = "sm" | "md" | "lg" | "xl";
 
 type StyleConfig = {
   card: string;
@@ -11,6 +12,16 @@ type StyleConfig = {
   title: string;
   desc: string;
   arrow: string;
+};
+
+type SizeConfig = {
+  padding: string;
+  gap: string;
+  iconWrap: string;
+  iconSize: number;
+  title: string;
+  desc: string;
+  arrowSize: number;
 };
 
 const STYLES: Record<CardStyle, StyleConfig> = {
@@ -51,40 +62,81 @@ const STYLES: Record<CardStyle, StyleConfig> = {
   },
 };
 
+const SIZES: Record<CardSize, SizeConfig> = {
+  sm: {
+    padding: "px-3 py-2.5",
+    gap: "gap-3",
+    iconWrap: "h-7 w-7",
+    iconSize: 14,
+    title: "text-xs",
+    desc: "text-[10px]",
+    arrowSize: 12,
+  },
+  md: {
+    padding: "px-5 py-4",
+    gap: "gap-4",
+    iconWrap: "h-9 w-9",
+    iconSize: 18,
+    title: "text-sm",
+    desc: "text-xs",
+    arrowSize: 14,
+  },
+  lg: {
+    padding: "px-6 py-5",
+    gap: "gap-4",
+    iconWrap: "h-11 w-11",
+    iconSize: 22,
+    title: "text-base",
+    desc: "text-sm",
+    arrowSize: 15,
+  },
+  xl: {
+    padding: "px-7 py-6",
+    gap: "gap-5",
+    iconWrap: "h-14 w-14",
+    iconSize: 26,
+    title: "text-lg",
+    desc: "text-sm",
+    arrowSize: 16,
+  },
+};
+
 type LinkCardProps = {
   link: Link;
   index: number;
   cardStyle?: CardStyle;
+  cardSize?: CardSize;
 };
 
-export function LinkCard({ link, index, cardStyle = "minimal" }: LinkCardProps) {
+export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md" }: LinkCardProps) {
   const s = STYLES[cardStyle] ?? STYLES.minimal;
+  const z = SIZES[cardSize] ?? SIZES.md;
 
   return (
     <a
       href={`/api/go/${link.id}`}
       target="_blank"
       rel="noopener noreferrer"
-      className={`animate-fade-in-up group flex items-center gap-4 px-5 py-4 transition-all duration-200 ${s.card}`}
+      className={`animate-fade-in-up group flex items-center ${z.padding} ${z.gap} transition-all duration-200 ${s.card}`}
       style={{ animationDelay: `${index * 60}ms` }}
     >
       {link.icon && (
-        <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${s.iconWrap}`}>
-          <Icon name={link.icon} size={18} />
+        <span className={`flex ${z.iconWrap} shrink-0 items-center justify-center rounded-lg transition-colors ${s.iconWrap}`}>
+          <Icon name={link.icon} size={z.iconSize} />
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <span className={`truncate text-sm font-medium ${s.title}`}>
+        <span className={`truncate font-medium ${z.title} ${s.title}`}>
           {link.title}
         </span>
         {link.description && (
-          <span className={`truncate text-xs mt-0.5 ${s.desc}`}>
+          <span className={`truncate mt-0.5 ${z.desc} ${s.desc}`}>
             {link.description}
           </span>
         )}
       </div>
       <ArrowRightIcon
-        size={14}
+        size={z.arrowSize}
         className={`shrink-0 transition-all duration-200 ${s.arrow}`}
       />
     </a>
