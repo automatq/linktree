@@ -116,9 +116,18 @@ export default async function ProfilePage({
         <div className="mb-6 h-px w-full bg-black/5 dark:bg-white/5" />
 
         <section className="w-full flex flex-col gap-2.5">
-          {userLinks.map((link, i) => (
-            <LinkCard key={link.id} link={link} index={i} cardStyle={cardStyle} cardSize={cardSize} />
-          ))}
+          {userLinks.map((link, i) =>
+            link.type === "header" ? (
+              <div key={link.id} className="animate-fade-in-up pt-3 pb-0.5 flex items-center gap-3" style={{ animationDelay: `${i * 60}ms` }}>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-black/30 dark:text-white/30 shrink-0">
+                  {link.title}
+                </span>
+                <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
+              </div>
+            ) : (
+              <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link" }} index={i} cardStyle={cardStyle} cardSize={cardSize} />
+            )
+          )}
         </section>
 
         <footer className="mt-auto pt-16 flex flex-col items-center gap-3">

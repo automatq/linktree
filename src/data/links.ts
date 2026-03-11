@@ -4,6 +4,7 @@ export type Link = {
   description?: string;
   url: string;
   icon?: string;
+  type?: "link" | "header";
 };
 
 export type SocialLink = {

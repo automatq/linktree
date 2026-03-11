@@ -79,7 +79,18 @@ export function AdminClient() {
       ...data!,
       links: [
         ...data!.links,
-        { id: genId(), title: "New Link", description: "", url: "#", icon: "globe" },
+        { id: genId(), title: "New Link", description: "", url: "#", icon: "globe", type: "link" as const },
+      ],
+    };
+    setData(next);
+  }
+
+  function addSection() {
+    const next = {
+      ...data!,
+      links: [
+        ...data!.links,
+        { id: genId(), title: "Section", description: "", url: "", icon: "", type: "header" as const },
       ],
     };
     setData(next);
@@ -252,27 +263,47 @@ export function AdminClient() {
             <Section
               title="Links"
               action={
-                <button
-                  onClick={addLink}
-                  className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                >
-                  <span className="text-base leading-none">+</span> Add link
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={addSection}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add section
+                  </button>
+                  <button
+                    onClick={addLink}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add link
+                  </button>
+                </div>
               }
             >
               <div className="flex flex-col gap-2">
-                {data.links.map((link, i) => (
-                  <LinkRow
-                    key={link.id}
-                    link={link}
-                    clickCount={stats?.byLink[link.id] ?? 0}
-                    isFirst={i === 0}
-                    isLast={i === data.links.length - 1}
-                    onChange={(f, v) => updateLink(link.id, f, v)}
-                    onDelete={() => deleteLink(link.id)}
-                    onMove={(dir) => moveLink(link.id, dir)}
-                  />
-                ))}
+                {data.links.map((link, i) =>
+                  link.type === "header" ? (
+                    <SectionRow
+                      key={link.id}
+                      link={link}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : (
+                    <LinkRow
+                      key={link.id}
+                      link={link}
+                      clickCount={stats?.byLink[link.id] ?? 0}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  )
+                )}
               </div>
             </Section>
 
@@ -333,6 +364,7 @@ function AnalyticsTab({
   const maxDay = Math.max(...stats.clicksByDay.map((d) => d.count), 1);
 
   const rankedLinks = links
+    .filter((l) => l.type !== "header")
     .map((l) => ({ id: l.id, title: l.title, count: stats.byLink[l.id] ?? 0 }))
     .sort((a, b) => b.count - a.count);
 
@@ -577,6 +609,63 @@ function LinkRow({
           {clickCount.toLocaleString()}
         </span>
       </div>
+    </div>
+  );
+}
+
+function SectionRow({
+  link,
+  isFirst,
+  isLast,
+  onChange,
+  onDelete,
+  onMove,
+}: {
+  link: Link;
+  isFirst: boolean;
+  isLast: boolean;
+  onChange: (field: string, value: string) => void;
+  onDelete: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02] px-3 py-2 flex items-center gap-2">
+      <div className="flex flex-col gap-0.5">
+        <button
+          onClick={() => onMove(-1)}
+          disabled={isFirst}
+          className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M5 2L1 7h8L5 2z" fill="currentColor" />
+          </svg>
+        </button>
+        <button
+          onClick={() => onMove(1)}
+          disabled={isLast}
+          className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            <path d="M5 8L1 3h8L5 8z" fill="currentColor" />
+          </svg>
+        </button>
+      </div>
+      <span className="text-[10px] uppercase tracking-widest text-black/30 dark:text-white/30 shrink-0">§</span>
+      <input
+        value={link.title}
+        onChange={(e) => onChange("title", e.target.value)}
+        placeholder="Section label"
+        className="flex-1 h-7 bg-transparent text-xs font-semibold uppercase tracking-widest text-black/50 dark:text-white/50 placeholder-black/20 dark:placeholder-white/20 outline-none"
+      />
+      <button
+        onClick={onDelete}
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-black/40 hover:bg-red-50 hover:text-red-500 dark:text-white/40 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </button>
     </div>
   );
 }

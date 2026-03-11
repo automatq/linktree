@@ -22,6 +22,7 @@ export const links = pgTable("links", {
   url: text("url").notNull().default("#"),
   icon: text("icon").notNull().default("globe"),
   position: integer("position").notNull().default(0),
+  type: text("type").notNull().default("link"),
 });
 
 export const socialLinks = pgTable("social_links", {
