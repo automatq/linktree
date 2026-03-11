@@ -10,7 +10,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Linktree",
+  title: "TriLink",
   description: "All your links in one place",
 };
 
