@@ -8,6 +8,7 @@ export const profiles = pgTable("profiles", {
   bio: text("bio").notNull().default(""),
   avatarInitials: text("avatar_initials").notNull().default(""),
   avatarUrl: text("avatar_url").notNull().default(""),
+  font: text("font").notNull().default("mono"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

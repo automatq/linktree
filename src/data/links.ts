@@ -18,6 +18,7 @@ export type Profile = {
   bio: string;
   avatarInitials: string;
   avatarUrl?: string;
+  font?: string;
 };
 
 export type LinksData = {

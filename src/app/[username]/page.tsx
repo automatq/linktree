@@ -32,8 +32,15 @@ export default async function ProfilePage({
     db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
   ]);
 
+  const fontMap: Record<string, string> = {
+    mono: "var(--font-geist-mono), monospace",
+    sans: "var(--font-geist-sans), sans-serif",
+    inter: "var(--font-inter), sans-serif",
+  };
+  const fontFamily = fontMap[profile.font ?? "mono"] ?? fontMap.mono;
+
   return (
-    <div className="min-h-screen bg-white dark:bg-black transition-colors duration-200">
+    <div className="min-h-screen bg-white dark:bg-black transition-colors duration-200" style={{ fontFamily }}>
       <div
         className="fixed inset-0 pointer-events-none"
         style={{

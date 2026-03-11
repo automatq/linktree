@@ -197,6 +197,9 @@ export function AdminClient() {
               <Field label="Bio">
                 <Textarea value={data.profile.bio} onChange={(v) => updateProfile("bio", v)} />
               </Field>
+              <Field label="Font Style">
+                <FontPicker value={data.profile.font ?? "mono"} onChange={(v) => updateProfile("font", v)} />
+              </Field>
             </div>
           </div>
         </Section>
@@ -534,6 +537,33 @@ function AvatarUpload({
       {!preview && (
         <span className="text-[10px] text-black/30 dark:text-white/30">Upload</span>
       )}
+    </div>
+  );
+}
+
+const FONTS = [
+  { value: "mono", label: "Geist Mono", style: "var(--font-geist-mono), monospace" },
+  { value: "sans", label: "Geist Sans", style: "var(--font-geist-sans), sans-serif" },
+  { value: "inter", label: "Inter", style: "var(--font-inter), sans-serif" },
+];
+
+function FontPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-2">
+      {FONTS.map((f) => (
+        <button
+          key={f.value}
+          onClick={() => onChange(f.value)}
+          className={`flex-1 h-9 rounded-md border text-xs transition-colors ${
+            value === f.value
+              ? "border-black dark:border-white text-black dark:text-white bg-black/5 dark:bg-white/5"
+              : "border-black/10 dark:border-white/10 text-black/40 dark:text-white/40 hover:border-black/25 dark:hover:border-white/25 hover:text-black/70 dark:hover:text-white/70"
+          }`}
+          style={{ fontFamily: f.style }}
+        >
+          {f.label}
+        </button>
+      ))}
     </div>
   );
 }
