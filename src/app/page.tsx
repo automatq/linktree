@@ -1,64 +1,80 @@
-import Image from "next/image";
+import { readFileSync } from "fs";
+import { join } from "path";
+import { Avatar } from "@/components/Avatar";
+import { LinkCard } from "@/components/LinkCard";
+import { SocialLinks } from "@/components/SocialLinks";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import type { LinksData } from "@/data/links";
+
+function getData(): LinksData {
+  return JSON.parse(
+    readFileSync(join(process.cwd(), "src/data/links.json"), "utf-8")
+  );
+}
+
+export const dynamic = "force-dynamic";
 
 export default function Home() {
+  const { profile, links, socialLinks } = getData();
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-white dark:bg-black transition-colors duration-200">
+      {/* Subtle grid background */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+      <div
+        className="fixed inset-0 pointer-events-none dark:block hidden"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+
+      {/* Theme toggle */}
+      <div className="fixed top-4 right-4">
+        <ThemeToggle />
+      </div>
+
+      <main className="relative mx-auto flex min-h-screen max-w-md flex-col items-center px-4 py-16">
+        {/* Profile */}
+        <section className="animate-fade-in-up mb-8 flex flex-col items-center gap-4 text-center">
+          <Avatar initials={profile.avatarInitials} avatarUrl={profile.avatarUrl} size={80} />
+          <div>
+            <h1 className="text-lg font-semibold text-black dark:text-white tracking-tight">
+              {profile.name}
+            </h1>
+            <p className="text-sm text-black/40 dark:text-white/40 mt-0.5">{profile.username}</p>
+          </div>
+          <p className="max-w-xs text-sm leading-relaxed text-black/60 dark:text-white/60">
+            {profile.bio}
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+        </section>
+
+        {/* Divider */}
+        <div className="mb-6 h-px w-full bg-black/5 dark:bg-white/5" />
+
+        {/* Links */}
+        <section className="w-full flex flex-col gap-2.5">
+          {links.map((link, i) => (
+            <LinkCard key={link.id} link={link} index={i} />
+          ))}
+        </section>
+
+        {/* Footer */}
+        <footer className="mt-auto pt-16 flex flex-col items-center gap-3">
+          <SocialLinks links={socialLinks} />
+          <p className="text-xs text-black/15 dark:text-white/15 select-none">
+            Built with{" "}
+            <span className="text-black/25 dark:text-white/25">Next.js</span>
+          </p>
+        </footer>
       </main>
     </div>
   );

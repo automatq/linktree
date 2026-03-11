@@ -1,0 +1,61 @@
+{
+  "profile": {
+    "name": "Chris Bender",
+    "username": "@ChrisBender",
+    "bio": "Building things on the internet. Founder & Developer.",
+    "avatarInitials": "CB",
+    "avatarUrl": "/uploads/avatar.png?v=1773257548538"
+  },
+  "links": [
+    {
+      "id": "1",
+      "title": "Portfolio",
+      "description": "My work and projects",
+      "url": "#",
+      "icon": "globe"
+    },
+    {
+      "id": "2",
+      "title": "AxiomFlow",
+      "description": "My latest startup",
+      "url": "#",
+      "icon": "zap"
+    },
+    {
+      "id": "3",
+      "title": "Blog",
+      "description": "Thoughts on dev, design & startups",
+      "url": "#",
+      "icon": "pen"
+    },
+    {
+      "id": "pdxu6i9",
+      "title": "Book a Call",
+      "description": "",
+      "url": "#",
+      "icon": "globe"
+    }
+  ],
+  "socialLinks": [
+    {
+      "platform": "GitHub",
+      "url": "#",
+      "icon": "github"
+    },
+    {
+      "platform": "Twitter / X",
+      "url": "#",
+      "icon": "twitter"
+    },
+    {
+      "platform": "LinkedIn",
+      "url": "#",
+      "icon": "linkedin"
+    },
+    {
+      "platform": "YouTube",
+      "url": "#",
+      "icon": "youtube"
+    }
+  ]
+}
