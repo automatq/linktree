@@ -17,12 +17,17 @@ export function AdminClient() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [clicks, setClicks] = useState<Record<string, number>>({});
   const { signOut } = useClerk();
 
   useEffect(() => {
-    fetch("/api/data").then((r) => r.json()).then((d) => {
+    Promise.all([
+      fetch("/api/data").then((r) => r.json()),
+      fetch("/api/stats").then((r) => r.json()),
+    ]).then(([d, stats]) => {
       setData(d);
       if (d.profile?.username) setUsername(d.profile.username);
+      setClicks(stats);
     });
   }, []);
 
@@ -221,6 +226,7 @@ export function AdminClient() {
               <LinkRow
                 key={link.id}
                 link={link}
+                clickCount={clicks[link.id] ?? 0}
                 isFirst={i === 0}
                 isLast={i === data.links.length - 1}
                 onChange={(f, v) => updateLink(link.id, f, v)}
@@ -354,6 +360,7 @@ function IconSelect({ value, onChange }: { value: string; onChange: (v: string) 
 
 function LinkRow({
   link,
+  clickCount,
   isFirst,
   isLast,
   onChange,
@@ -361,6 +368,7 @@ function LinkRow({
   onMove,
 }: {
   link: Link;
+  clickCount: number;
   isFirst: boolean;
   isLast: boolean;
   onChange: (field: string, value: string) => void;
@@ -409,8 +417,16 @@ function LinkRow({
         </button>
       </div>
 
-      <div className="pl-7">
+      <div className="pl-7 flex items-center gap-2">
         <Input value={link.description ?? ""} onChange={(v) => onChange("description", v)} placeholder="Description (optional)" />
+        <span className="shrink-0 flex items-center gap-1 text-[11px] text-black/30 dark:text-white/30 whitespace-nowrap">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <polyline points="10 17 15 12 10 7" />
+            <line x1="15" y1="12" x2="3" y2="12" />
+          </svg>
+          {clickCount.toLocaleString()}
+        </span>
       </div>
     </div>
   );

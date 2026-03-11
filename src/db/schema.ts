@@ -30,3 +30,10 @@ export const socialLinks = pgTable("social_links", {
   icon: text("icon").notNull().default("globe"),
   position: integer("position").notNull().default(0),
 });
+
+export const linkClicks = pgTable("link_clicks", {
+  id: serial("id").primaryKey(),
+  linkId: text("link_id").notNull(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  clickedAt: timestamp("clicked_at").defaultNow(),
+});
