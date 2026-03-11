@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
+import { after } from "next/server";
 import Link from "next/link";
 import { db } from "@/db";
-import { profiles, links, socialLinks } from "@/db/schema";
+import { profiles, links, socialLinks, profileViews } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { LinkCard } from "@/components/LinkCard";
@@ -31,6 +32,11 @@ export default async function ProfilePage({
     db.select().from(links).where(eq(links.profileId, profile.id)).orderBy(asc(links.position)),
     db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
   ]);
+
+  // Track view after response is sent — no latency impact
+  after(async () => {
+    await db.insert(profileViews).values({ profileId: profile.id }).catch(() => {});
+  });
 
   const fontMap: Record<string, string> = {
     mono: "var(--font-geist-mono), monospace",

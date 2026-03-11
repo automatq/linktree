@@ -37,3 +37,9 @@ export const linkClicks = pgTable("link_clicks", {
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   clickedAt: timestamp("clicked_at").defaultNow(),
 });
+
+export const profileViews = pgTable("profile_views", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  viewedAt: timestamp("viewed_at").defaultNow(),
+});

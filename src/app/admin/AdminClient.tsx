@@ -12,22 +12,30 @@ function genId() {
   return Math.random().toString(36).slice(2, 9);
 }
 
+type Stats = {
+  byLink: Record<string, number>;
+  clicksByDay: Array<{ date: string; count: number }>;
+  totalViews: number;
+  linkTitles: Record<string, string>;
+};
+
 export function AdminClient() {
   const [data, setData] = useState<LinksData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
-  const [clicks, setClicks] = useState<Record<string, number>>({});
+  const [stats, setStats] = useState<Stats | null>(null);
+  const [tab, setTab] = useState<"content" | "analytics">("content");
   const { signOut } = useClerk();
 
   useEffect(() => {
     Promise.all([
       fetch("/api/data").then((r) => r.json()),
       fetch("/api/stats").then((r) => r.json()),
-    ]).then(([d, stats]) => {
+    ]).then(([d, s]) => {
       setData(d);
       if (d.profile?.username) setUsername(d.profile.username);
-      setClicks(stats);
+      setStats(s);
     });
   }, []);
 
@@ -121,6 +129,8 @@ export function AdminClient() {
     setData(next);
   }
 
+  const totalClicks = stats ? Object.values(stats.byLink).reduce((a, b) => a + b, 0) : 0;
+
   return (
     <div className="min-h-screen bg-white dark:bg-black transition-colors duration-200">
       {/* Grid bg */}
@@ -144,25 +154,43 @@ export function AdminClient() {
       {/* Header */}
       <header className="relative border-b border-black/8 dark:border-white/8 bg-white/80 dark:bg-black/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 h-12">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {username && (
               <a href={`/${username}`} target="_blank" className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors">
                 ← Live page
               </a>
             )}
-            <span className="text-xs font-medium text-black/70 dark:text-white/70">CMS</span>
+            <nav className="flex gap-1">
+              {(["content", "analytics"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
+                    tab === t
+                      ? "bg-black/8 dark:bg-white/8 text-black dark:text-white"
+                      : "text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
+            </nav>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "text-black/0 dark:text-white/0"}`}>
-              Saved
-            </span>
-            <button
-              onClick={() => save(data!)}
-              disabled={saving}
-              className="flex h-7 items-center gap-1.5 rounded-md bg-black px-3 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-40 dark:bg-white dark:text-black"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
+            {tab === "content" && (
+              <>
+                <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "text-black/0 dark:text-white/0"}`}>
+                  Saved
+                </span>
+                <button
+                  onClick={() => save(data!)}
+                  disabled={saving}
+                  className="flex h-7 items-center gap-1.5 rounded-md bg-black px-3 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-40 dark:bg-white dark:text-black"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </>
+            )}
             <button
               onClick={() => signOut({ redirectUrl: "/" })}
               className="flex h-7 items-center rounded-md border border-black/10 dark:border-white/10 px-3 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
@@ -176,92 +204,204 @@ export function AdminClient() {
 
       <main className="relative mx-auto max-w-2xl px-4 py-10 flex flex-col gap-8">
 
-        {/* Profile section */}
-        <Section title="Profile">
-          <div className="flex gap-4 items-start">
-            <AvatarUpload
-              avatarUrl={data.profile.avatarUrl}
-              initials={data.profile.avatarInitials}
-              onUploaded={(url) => {
-                const next = { ...data, profile: { ...data.profile, avatarUrl: url } };
-                setData(next);
-              }}
-            />
-            <div className="flex-1 flex flex-col gap-3">
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Name">
-                  <Input value={data.profile.name} onChange={(v) => updateProfile("name", v)} />
-                </Field>
-                <Field label="Username">
-                  <Input value={data.profile.username} onChange={(v) => updateProfile("username", v)} />
-                </Field>
-                <Field label="Avatar Initials">
-                  <Input value={data.profile.avatarInitials} onChange={(v) => updateProfile("avatarInitials", v)} maxLength={3} />
-                </Field>
+        {tab === "content" && (
+          <>
+            {/* Profile section */}
+            <Section title="Profile">
+              <div className="flex gap-4 items-start">
+                <AvatarUpload
+                  avatarUrl={data.profile.avatarUrl}
+                  initials={data.profile.avatarInitials}
+                  onUploaded={(url) => {
+                    const next = { ...data, profile: { ...data.profile, avatarUrl: url } };
+                    setData(next);
+                  }}
+                />
+                <div className="flex-1 flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Name">
+                      <Input value={data.profile.name} onChange={(v) => updateProfile("name", v)} />
+                    </Field>
+                    <Field label="Username">
+                      <Input value={data.profile.username} onChange={(v) => updateProfile("username", v)} />
+                    </Field>
+                    <Field label="Avatar Initials">
+                      <Input value={data.profile.avatarInitials} onChange={(v) => updateProfile("avatarInitials", v)} maxLength={3} />
+                    </Field>
+                  </div>
+                  <Field label="Bio">
+                    <Textarea value={data.profile.bio} onChange={(v) => updateProfile("bio", v)} />
+                  </Field>
+                  <Field label="Font Style">
+                    <FontPicker value={data.profile.font ?? "mono"} onChange={(v) => updateProfile("font", v)} />
+                  </Field>
+                </div>
               </div>
-              <Field label="Bio">
-                <Textarea value={data.profile.bio} onChange={(v) => updateProfile("bio", v)} />
-              </Field>
-              <Field label="Font Style">
-                <FontPicker value={data.profile.font ?? "mono"} onChange={(v) => updateProfile("font", v)} />
-              </Field>
-            </div>
-          </div>
-        </Section>
+            </Section>
 
-        {/* Links section */}
-        <Section
-          title="Links"
-          action={
-            <button
-              onClick={addLink}
-              className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+            {/* Links section */}
+            <Section
+              title="Links"
+              action={
+                <button
+                  onClick={addLink}
+                  className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                >
+                  <span className="text-base leading-none">+</span> Add link
+                </button>
+              }
             >
-              <span className="text-base leading-none">+</span> Add link
-            </button>
-          }
-        >
-          <div className="flex flex-col gap-2">
-            {data.links.map((link, i) => (
-              <LinkRow
-                key={link.id}
-                link={link}
-                clickCount={clicks[link.id] ?? 0}
-                isFirst={i === 0}
-                isLast={i === data.links.length - 1}
-                onChange={(f, v) => updateLink(link.id, f, v)}
-                onDelete={() => deleteLink(link.id)}
-                onMove={(dir) => moveLink(link.id, dir)}
-              />
-            ))}
-          </div>
-        </Section>
+              <div className="flex flex-col gap-2">
+                {data.links.map((link, i) => (
+                  <LinkRow
+                    key={link.id}
+                    link={link}
+                    clickCount={stats?.byLink[link.id] ?? 0}
+                    isFirst={i === 0}
+                    isLast={i === data.links.length - 1}
+                    onChange={(f, v) => updateLink(link.id, f, v)}
+                    onDelete={() => deleteLink(link.id)}
+                    onMove={(dir) => moveLink(link.id, dir)}
+                  />
+                ))}
+              </div>
+            </Section>
 
-        {/* Social links section */}
-        <Section
-          title="Social Links"
-          action={
-            <button
-              onClick={addSocial}
-              className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+            {/* Social links section */}
+            <Section
+              title="Social Links"
+              action={
+                <button
+                  onClick={addSocial}
+                  className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                >
+                  <span className="text-base leading-none">+</span> Add
+                </button>
+              }
             >
-              <span className="text-base leading-none">+</span> Add
-            </button>
-          }
-        >
-          <div className="flex flex-col gap-2">
-            {data.socialLinks.map((social) => (
-              <SocialRow
-                key={social.platform}
-                social={social}
-                onChange={(f, v) => updateSocial(social.platform, f, v)}
-                onDelete={() => deleteSocial(social.platform)}
-              />
-            ))}
-          </div>
-        </Section>
+              <div className="flex flex-col gap-2">
+                {data.socialLinks.map((social) => (
+                  <SocialRow
+                    key={social.platform}
+                    social={social}
+                    onChange={(f, v) => updateSocial(social.platform, f, v)}
+                    onDelete={() => deleteSocial(social.platform)}
+                  />
+                ))}
+              </div>
+            </Section>
+          </>
+        )}
+
+        {tab === "analytics" && (
+          <AnalyticsTab stats={stats} totalClicks={totalClicks} links={data.links} />
+        )}
 
       </main>
+    </div>
+  );
+}
+
+// ── Analytics Tab ────────────────────────────────────────────────────────────
+
+function AnalyticsTab({
+  stats,
+  totalClicks,
+  links,
+}: {
+  stats: Stats | null;
+  totalClicks: number;
+  links: Link[];
+}) {
+  if (!stats) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <span className="text-xs text-black/30 dark:text-white/30">Loading analytics…</span>
+      </div>
+    );
+  }
+
+  const maxDay = Math.max(...stats.clicksByDay.map((d) => d.count), 1);
+
+  const rankedLinks = links
+    .map((l) => ({ id: l.id, title: l.title, count: stats.byLink[l.id] ?? 0 }))
+    .sort((a, b) => b.count - a.count);
+
+  const maxLinkClicks = Math.max(...rankedLinks.map((l) => l.count), 1);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const todayClicks = stats.clicksByDay.find((d) => d.date === today)?.count ?? 0;
+
+  return (
+    <div className="flex flex-col gap-8">
+      {/* Stat cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatCard label="Total clicks" value={totalClicks.toLocaleString()} />
+        <StatCard label="Profile views" value={stats.totalViews.toLocaleString()} />
+        <StatCard label="Today" value={todayClicks.toLocaleString()} />
+      </div>
+
+      {/* Daily chart */}
+      <Section title="Clicks — Last 14 Days">
+        <div className="flex items-end gap-1.5 h-28 pt-2">
+          {stats.clicksByDay.map((d) => {
+            const height = d.count === 0 ? 2 : Math.max(8, Math.round((d.count / maxDay) * 96));
+            const isToday = d.date === today;
+            const label = d.date.slice(5).replace("-", "/");
+            return (
+              <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5" title={`${d.date}: ${d.count} click${d.count !== 1 ? "s" : ""}`}>
+                <div
+                  className={`w-full rounded-sm transition-all ${isToday ? "bg-black dark:bg-white" : "bg-black/15 dark:bg-white/15"}`}
+                  style={{ height: `${height}px` }}
+                />
+                <span className={`text-[9px] ${isToday ? "text-black/50 dark:text-white/50" : "text-black/20 dark:text-white/20"}`}>
+                  {label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </Section>
+
+      {/* Link performance */}
+      <Section title="Link Performance">
+        {rankedLinks.length === 0 ? (
+          <p className="text-xs text-black/30 dark:text-white/30 text-center py-2">No links yet</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {rankedLinks.map((link, i) => (
+              <div key={link.id} className="flex items-center gap-3">
+                <span className="text-[11px] text-black/20 dark:text-white/20 w-4 shrink-0 text-right">{i + 1}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs text-black/70 dark:text-white/70 truncate">{link.title || "Untitled"}</span>
+                    <span className="text-xs text-black/40 dark:text-white/40 ml-2 shrink-0">{link.count.toLocaleString()}</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-black/25 dark:bg-white/25 transition-all"
+                      style={{ width: `${(link.count / maxLinkClicks) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <p className="text-center text-[11px] text-black/20 dark:text-white/20">
+        Click counts update in real time. Profile views tracked since analytics were enabled.
+      </p>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex flex-col gap-1">
+      <span className="text-2xl font-semibold text-black dark:text-white tracking-tight">{value}</span>
+      <span className="text-[11px] text-black/35 dark:text-white/35 uppercase tracking-wider">{label}</span>
     </div>
   );
 }
@@ -512,14 +652,12 @@ function AvatarUpload({
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
       >
-        {/* Avatar circle */}
         <div className="w-16 h-16 rounded-full bg-black dark:bg-white text-white dark:text-black flex items-center justify-center font-semibold text-xl ring-1 ring-black/10 dark:ring-white/10 overflow-hidden select-none relative">
           {preview ? (
             <Image src={preview} alt="Avatar" fill className="object-cover" sizes="64px" />
           ) : (
             initials
           )}
-          {/* Overlay on hover */}
           <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity">
             {uploading ? (
               <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
