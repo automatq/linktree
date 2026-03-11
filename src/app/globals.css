@@ -2,7 +2,7 @@
 
 @variant dark (&:where(.dark, .dark *));
 
-html {
+html.dark {
   color-scheme: dark;
 }
 
