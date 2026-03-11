@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { profiles, links, socialLinks, profileViews } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
-import { LinkCard } from "@/components/LinkCard";
+import { LinkCard, type CardStyle } from "@/components/LinkCard";
 import { SocialLinks } from "@/components/SocialLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -37,6 +37,8 @@ export default async function ProfilePage({
   after(async () => {
     await db.insert(profileViews).values({ profileId: profile.id }).catch(() => {});
   });
+
+  const cardStyle = (profile.cardStyle ?? "minimal") as CardStyle;
 
   const fontMap: Record<string, string> = {
     mono: "var(--font-geist-mono), monospace",
@@ -100,7 +102,7 @@ export default async function ProfilePage({
 
         <section className="w-full flex flex-col gap-2.5">
           {userLinks.map((link, i) => (
-            <LinkCard key={link.id} link={link} index={i} />
+            <LinkCard key={link.id} link={link} index={i} cardStyle={cardStyle} />
           ))}
         </section>
 

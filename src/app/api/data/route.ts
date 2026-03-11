@@ -14,7 +14,7 @@ export async function GET() {
 
   if (!profile) {
     return NextResponse.json({
-      profile: { name: "", username: "", bio: "", avatarInitials: "", avatarUrl: "", font: "mono" },
+      profile: { name: "", username: "", bio: "", avatarInitials: "", avatarUrl: "", font: "mono", cardStyle: "minimal" },
       links: [],
       socialLinks: [],
     });
@@ -33,6 +33,7 @@ export async function GET() {
       avatarInitials: profile.avatarInitials,
       avatarUrl: profile.avatarUrl,
       font: profile.font,
+      cardStyle: profile.cardStyle,
     },
     links: userLinks.map((l) => ({
       id: l.id,
@@ -70,6 +71,7 @@ export async function POST(req: Request) {
       avatarInitials: profileData.avatarInitials,
       avatarUrl: profileData.avatarUrl || "",
       font: profileData.font || "mono",
+      cardStyle: profileData.cardStyle || "minimal",
     }).returning();
     profile = created;
   } else {
@@ -81,6 +83,7 @@ export async function POST(req: Request) {
         avatarInitials: profileData.avatarInitials,
         avatarUrl: profileData.avatarUrl || "",
         font: profileData.font || "mono",
+        cardStyle: profileData.cardStyle || "minimal",
       })
       .where(eq(profiles.userId, userId))
       .returning();

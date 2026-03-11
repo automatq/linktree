@@ -19,6 +19,7 @@ export type Profile = {
   avatarInitials: string;
   avatarUrl?: string;
   font?: string;
+  cardStyle?: string;
 };
 
 export type LinksData = {

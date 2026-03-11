@@ -9,6 +9,7 @@ export const profiles = pgTable("profiles", {
   avatarInitials: text("avatar_initials").notNull().default(""),
   avatarUrl: text("avatar_url").notNull().default(""),
   font: text("font").notNull().default("mono"),
+  cardStyle: text("card_style").notNull().default("minimal"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

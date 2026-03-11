@@ -239,6 +239,11 @@ export function AdminClient() {
               </div>
             </Section>
 
+            {/* Card Style section */}
+            <Section title="Card Style">
+              <StylePicker value={data.profile.cardStyle ?? "minimal"} onChange={(v) => updateProfile("cardStyle", v)} />
+            </Section>
+
             {/* Links section */}
             <Section
               title="Links"
@@ -718,6 +723,96 @@ function FontPicker({ value, onChange }: { value: string; onChange: (v: string) 
           {f.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+// ── Style Picker ─────────────────────────────────────────────────────────────
+
+const CARD_STYLE_OPTIONS: Array<{
+  value: string;
+  label: string;
+  preview: React.ReactNode;
+}> = [
+  {
+    value: "minimal",
+    label: "Minimal",
+    preview: (
+      <div className="w-full h-8 rounded-lg border border-black/15 dark:border-white/15 bg-black/[0.04] dark:bg-white/[0.04] flex items-center px-2 gap-1.5">
+        <div className="w-3.5 h-3.5 rounded bg-black/10 dark:bg-white/10 shrink-0" />
+        <div className="flex-1 h-1.5 rounded bg-black/10 dark:bg-white/10" />
+        <div className="w-1.5 h-1.5 rounded bg-black/10 dark:bg-white/10 shrink-0" />
+      </div>
+    ),
+  },
+  {
+    value: "solid",
+    label: "Solid",
+    preview: (
+      <div className="w-full h-8 rounded-lg bg-black dark:bg-white flex items-center px-2 gap-1.5">
+        <div className="w-3.5 h-3.5 rounded bg-white/20 dark:bg-black/20 shrink-0" />
+        <div className="flex-1 h-1.5 rounded bg-white/30 dark:bg-black/30" />
+        <div className="w-1.5 h-1.5 rounded bg-white/20 dark:bg-black/20 shrink-0" />
+      </div>
+    ),
+  },
+  {
+    value: "ghost",
+    label: "Ghost",
+    preview: (
+      <div className="w-full h-8 rounded-lg flex items-center px-2 gap-1.5">
+        <div className="w-3.5 h-3.5 rounded bg-black/8 dark:bg-white/8 shrink-0" />
+        <div className="flex-1 h-1.5 rounded bg-black/10 dark:bg-white/10" />
+        <div className="w-1.5 h-1.5 rounded bg-black/8 dark:bg-white/8 shrink-0" />
+      </div>
+    ),
+  },
+  {
+    value: "lift",
+    label: "Lift",
+    preview: (
+      <div className="w-full h-8 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-white/[0.06] shadow-lg flex items-center px-2 gap-1.5">
+        <div className="w-3.5 h-3.5 rounded bg-black/8 dark:bg-white/8 shrink-0" />
+        <div className="flex-1 h-1.5 rounded bg-black/10 dark:bg-white/10" />
+        <div className="w-1.5 h-1.5 rounded bg-black/8 dark:bg-white/8 shrink-0" />
+      </div>
+    ),
+  },
+  {
+    value: "sharp",
+    label: "Sharp",
+    preview: (
+      <div className="w-full h-8 border-l-2 border-black/40 dark:border-white/40 flex items-center px-2 gap-1.5">
+        <div className="w-3.5 h-3.5 rounded-sm bg-black/8 dark:bg-white/8 shrink-0" />
+        <div className="flex-1 h-1.5 rounded bg-black/10 dark:bg-white/10" />
+        <div className="w-2 h-1.5 rounded bg-black/8 dark:bg-white/8 shrink-0" />
+      </div>
+    ),
+  },
+];
+
+function StylePicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="grid grid-cols-5 gap-2">
+      {CARD_STYLE_OPTIONS.map((opt) => {
+        const active = value === opt.value;
+        return (
+          <button
+            key={opt.value}
+            onClick={() => onChange(opt.value)}
+            className={`flex flex-col gap-2 p-2 rounded-lg border transition-colors ${
+              active
+                ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
+                : "border-black/8 dark:border-white/8 hover:border-black/20 dark:hover:border-white/20"
+            }`}
+          >
+            {opt.preview}
+            <span className={`text-[11px] text-center ${active ? "text-black dark:text-white font-medium" : "text-black/40 dark:text-white/40"}`}>
+              {opt.label}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
