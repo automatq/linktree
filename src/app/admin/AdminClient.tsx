@@ -2458,19 +2458,24 @@ function AvatarUpload({
 }
 
 const FONTS = [
-  { value: "mono", label: "Geist Mono", style: "var(--font-geist-mono), monospace" },
-  { value: "sans", label: "Geist Sans", style: "var(--font-geist-sans), sans-serif" },
-  { value: "inter", label: "Inter", style: "var(--font-inter), sans-serif" },
+  { value: "mono",          label: "Geist Mono",    style: "var(--font-geist-mono), monospace" },
+  { value: "sans",          label: "Geist Sans",    style: "var(--font-geist-sans), sans-serif" },
+  { value: "inter",         label: "Inter",         style: "var(--font-inter), sans-serif" },
+  { value: "dm-sans",       label: "DM Sans",       style: "var(--font-dm-sans), sans-serif" },
+  { value: "outfit",        label: "Outfit",        style: "var(--font-outfit), sans-serif" },
+  { value: "space-grotesk", label: "Space Grotesk", style: "var(--font-space-grotesk), sans-serif" },
+  { value: "playfair",      label: "Playfair",      style: "var(--font-playfair), Georgia, serif" },
+  { value: "lora",          label: "Lora",          style: "var(--font-lora), Georgia, serif" },
 ];
 
 function FontPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <div className="flex gap-2">
+    <div className="grid grid-cols-4 gap-2">
       {FONTS.map((f) => (
         <button
           key={f.value}
           onClick={() => onChange(f.value)}
-          className={`flex-1 h-9 rounded-md border text-xs transition-colors ${
+          className={`h-10 rounded-md border text-xs transition-colors ${
             value === f.value
               ? "border-black dark:border-white text-black dark:text-white bg-black/5 dark:bg-white/5"
               : "border-black/10 dark:border-white/10 text-black/40 dark:text-white/40 hover:border-black/25 dark:hover:border-white/25 hover:text-black/70 dark:hover:text-white/70"

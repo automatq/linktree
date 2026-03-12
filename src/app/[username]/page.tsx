@@ -101,6 +101,11 @@ export default async function ProfilePage({
     mono: "var(--font-geist-mono), monospace",
     sans: "var(--font-geist-sans), sans-serif",
     inter: "var(--font-inter), sans-serif",
+    playfair: "var(--font-playfair), Georgia, serif",
+    "dm-sans": "var(--font-dm-sans), sans-serif",
+    "space-grotesk": "var(--font-space-grotesk), sans-serif",
+    lora: "var(--font-lora), Georgia, serif",
+    outfit: "var(--font-outfit), sans-serif",
   };
   const fontFamily = fontMap[profile.font ?? "mono"] ?? fontMap.mono;
 
