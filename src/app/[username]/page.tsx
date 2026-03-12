@@ -119,7 +119,7 @@ export default async function ProfilePage({
             <p className={`${ps.username} text-black/40 dark:text-white/40 mt-0.5`}>@{profile.username}</p>
           </div>
           {profile.bio && (
-            <p className={`max-w-xs ${ps.bio} leading-relaxed text-black/60 dark:text-white/60`}>
+            <p className={`max-w-xs ${ps.bio} leading-relaxed text-black/60 dark:text-white/60 whitespace-pre-wrap`}>
               {profile.bio}
             </p>
           )}
