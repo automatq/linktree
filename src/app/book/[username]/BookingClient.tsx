@@ -283,21 +283,25 @@ export function BookingClient({ username, hostName, title, duration, accentColor
                   <button
                     key={slot}
                     onClick={() => handleSlotSelect(slot)}
-                    className="rounded-lg border px-3 py-2.5 text-sm font-medium transition-all"
-                    style={{
+                    className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-all ${
+                      accentColor
+                        ? ""
+                        : "border-black/20 dark:border-white/20 text-black dark:text-white hover:bg-black hover:text-white hover:border-black dark:hover:bg-white dark:hover:text-black dark:hover:border-white"
+                    }`}
+                    style={accentColor ? {
                       borderColor: accent + "40",
                       color: accent,
-                    }}
-                    onMouseEnter={(e) => {
+                    } : undefined}
+                    onMouseEnter={accentColor ? (e) => {
                       (e.currentTarget as HTMLButtonElement).style.background = accent;
                       (e.currentTarget as HTMLButtonElement).style.color = "white";
                       (e.currentTarget as HTMLButtonElement).style.borderColor = accent;
-                    }}
-                    onMouseLeave={(e) => {
+                    } : undefined}
+                    onMouseLeave={accentColor ? (e) => {
                       (e.currentTarget as HTMLButtonElement).style.background = "";
                       (e.currentTarget as HTMLButtonElement).style.color = accent;
                       (e.currentTarget as HTMLButtonElement).style.borderColor = accent + "40";
-                    }}
+                    } : undefined}
                   >
                     {formatSlotLocal(slot)}
                   </button>
