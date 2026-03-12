@@ -28,7 +28,7 @@ export function AdminClient() {
   const [saved, setSaved] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [tab, setTab] = useState<"content" | "analytics">("content");
+  const [tab, setTab] = useState<"content" | "analytics" | "booking">("content");
   const [showQR, setShowQR] = useState(false);
   const { signOut } = useClerk();
 
@@ -194,7 +194,7 @@ export function AdminClient() {
               </>
             )}
             <nav className="flex gap-1">
-              {(["content", "analytics"] as const).map((t) => (
+              {(["content", "analytics", "booking"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -210,7 +210,7 @@ export function AdminClient() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            {tab === "content" && (
+            {(tab === "content") && (
               <>
                 <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "text-black/0 dark:text-white/0"}`}>
                   Saved
@@ -391,10 +391,310 @@ export function AdminClient() {
           <AnalyticsTab links={data.links} />
         )}
 
+        {tab === "booking" && data.profile && (
+          <BookingTab profile={data.profile} username={username ?? ""} />
+        )}
+
       </main>
 
       {showQR && username && (
         <QRModal username={username} onClose={() => setShowQR(false)} />
+      )}
+    </div>
+  );
+}
+
+// ── Booking Tab ──────────────────────────────────────────────────────────────
+
+const DAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DURATION_OPTIONS = [15, 30, 45, 60];
+const BUFFER_OPTIONS = [0, 5, 10, 15];
+const ADVANCE_OPTIONS = [7, 14, 30, 60, 90];
+
+const TIMEZONES = [
+  "UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Vancouver", "America/Toronto", "America/Sao_Paulo", "Europe/London",
+  "Europe/Paris", "Europe/Berlin", "Europe/Amsterdam", "Europe/Rome", "Europe/Madrid",
+  "Europe/Athens", "Europe/Moscow", "Asia/Dubai", "Asia/Karachi", "Asia/Kolkata",
+  "Asia/Dhaka", "Asia/Bangkok", "Asia/Singapore", "Asia/Tokyo", "Asia/Seoul",
+  "Asia/Shanghai", "Australia/Sydney", "Australia/Melbourne", "Pacific/Auckland",
+];
+
+type AvailabilityWindow = { dayOfWeek: number; startTime: string; endTime: string };
+type BookingRecord = {
+  id: string; guestName: string; guestEmail: string; notes: string;
+  startsAt: string; endsAt: string; status: string; guestTimezone: string;
+};
+
+function BookingTab({ profile, username }: { profile: import("@/data/links").Profile; username: string }) {
+  const [enabled, setEnabled] = useState(profile.bookingEnabled ?? false);
+  const [title, setTitle] = useState(profile.bookingTitle ?? "Book a call");
+  const [duration, setDuration] = useState(profile.bookingDuration ?? 30);
+  const [buffer, setBuffer] = useState(profile.bookingBuffer ?? 0);
+  const [advanceDays, setAdvanceDays] = useState(profile.bookingAdvanceDays ?? 30);
+  const [email, setEmail] = useState(profile.bookingEmail ?? "");
+  const [timezone, setTimezone] = useState(profile.bookingTimezone ?? "UTC");
+  const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
+  const [bookingsList, setBookingsList] = useState<BookingRecord[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState(false);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+
+  useEffect(() => {
+    setLoadingBookings(true);
+    fetch("/api/admin/bookings")
+      .then((r) => r.json())
+      .then((d) => {
+        setWindows(d.availability || []);
+        setBookingsList(d.bookings || []);
+      })
+      .finally(() => setLoadingBookings(false));
+  }, []);
+
+  const toggleDay = (dow: number) => {
+    const existing = windows.filter((w) => w.dayOfWeek === dow);
+    if (existing.length > 0) {
+      setWindows((prev) => prev.filter((w) => w.dayOfWeek !== dow));
+    } else {
+      setWindows((prev) => [...prev, { dayOfWeek: dow, startTime: "09:00", endTime: "17:00" }]);
+    }
+  };
+
+  const updateWindow = (dow: number, field: "startTime" | "endTime", val: string) => {
+    setWindows((prev) => prev.map((w) => w.dayOfWeek === dow ? { ...w, [field]: val } : w));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    await fetch("/api/admin/bookings", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        config: { enabled, title, duration, buffer, advanceDays, email, timezone },
+        windows,
+      }),
+    });
+    setSaving(false);
+    setSavedMsg(true);
+    setTimeout(() => setSavedMsg(false), 2000);
+  };
+
+  const cancelBooking = async (id: string) => {
+    await fetch(`/api/admin/bookings/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "cancelled" }),
+    });
+    setBookingsList((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b));
+  };
+
+  const upcoming = bookingsList.filter((b) => b.status === "confirmed" && new Date(b.startsAt) > new Date());
+  const past = bookingsList.filter((b) => b.status !== "confirmed" || new Date(b.startsAt) <= new Date());
+
+  const inputClass = "h-8 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors";
+  const selectClass = inputClass + " pr-6";
+
+  function formatBookingTime(iso: string) {
+    return new Date(iso).toLocaleString("en-US", {
+      weekday: "short", month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit",
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Enable toggle */}
+      <Section
+        title="Booking"
+        action={
+          <div className="flex items-center gap-2">
+            <span className={`text-xs transition-all duration-300 ${savedMsg ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          {/* Enable */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-black dark:text-white">Enable booking page</p>
+              <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
+                {enabled && username ? (
+                  <a href={`/book/${username}`} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
+                    /book/{username}
+                  </a>
+                ) : "Guests can book time directly from your profile"}
+              </p>
+            </div>
+            <button
+              onClick={() => setEnabled((v) => !v)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${enabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${enabled ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+
+          {enabled && (
+            <>
+              {/* Title */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Booking title</label>
+                <input
+                  className={inputClass + " w-full"}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Book a call"
+                />
+              </div>
+
+              {/* Duration + Buffer */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Duration</label>
+                  <select className={selectClass + " w-full"} value={duration} onChange={(e) => setDuration(Number(e.target.value))}>
+                    {DURATION_OPTIONS.map((d) => <option key={d} value={d}>{d} min</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Buffer between</label>
+                  <select className={selectClass + " w-full"} value={buffer} onChange={(e) => setBuffer(Number(e.target.value))}>
+                    {BUFFER_OPTIONS.map((b) => <option key={b} value={b}>{b === 0 ? "None" : `${b} min`}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Advance days + timezone */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Book up to</label>
+                  <select className={selectClass + " w-full"} value={advanceDays} onChange={(e) => setAdvanceDays(Number(e.target.value))}>
+                    {ADVANCE_OPTIONS.map((d) => <option key={d} value={d}>{d} days out</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Timezone</label>
+                  <select className={selectClass + " w-full"} value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+                    {TIMEZONES.map((tz) => <option key={tz} value={tz}>{tz.replace(/_/g, " ")}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Notification email */}
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Notification email</label>
+                <input
+                  type="email"
+                  className={inputClass + " w-full"}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </Section>
+
+      {/* Availability grid */}
+      {enabled && (
+        <Section title="Availability">
+          <div className="flex flex-col gap-2">
+            {DAY_LABELS.map((label, dow) => {
+              const win = windows.find((w) => w.dayOfWeek === dow);
+              const active = !!win;
+              return (
+                <div key={dow} className="flex items-center gap-3">
+                  <button
+                    onClick={() => toggleDay(dow)}
+                    className={`w-10 text-xs font-medium rounded-md px-1 py-1 transition-colors ${
+                      active
+                        ? "bg-black dark:bg-white text-white dark:text-black"
+                        : "border border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                  {active && win ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <input
+                        type="time"
+                        value={win.startTime}
+                        onChange={(e) => updateWindow(dow, "startTime", e.target.value)}
+                        className={inputClass}
+                      />
+                      <span className="text-xs text-black/30 dark:text-white/30">–</span>
+                      <input
+                        type="time"
+                        value={win.endTime}
+                        onChange={(e) => updateWindow(dow, "endTime", e.target.value)}
+                        className={inputClass}
+                      />
+                    </div>
+                  ) : (
+                    <span className="text-xs text-black/20 dark:text-white/20">Unavailable</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* Upcoming bookings */}
+      {enabled && (
+        <Section title={`Upcoming (${upcoming.length})`}>
+          {loadingBookings ? (
+            <div className="flex justify-center py-4">
+              <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+            </div>
+          ) : upcoming.length === 0 ? (
+            <p className="text-xs text-black/30 dark:text-white/30 py-2">No upcoming bookings.</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {upcoming.map((b) => (
+                <div key={b.id} className="rounded-lg border border-black/8 dark:border-white/8 p-3 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-black dark:text-white truncate">{b.guestName}</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 truncate">{b.guestEmail}</p>
+                    <p className="text-xs text-black/50 dark:text-white/50 mt-0.5">{formatBookingTime(b.startsAt)}</p>
+                    {b.notes && <p className="text-xs text-black/30 dark:text-white/30 mt-1 italic">{b.notes}</p>}
+                  </div>
+                  <button
+                    onClick={() => cancelBooking(b.id)}
+                    className="shrink-0 text-[10px] text-red-400 hover:text-red-500 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+      )}
+
+      {/* Past / cancelled */}
+      {enabled && past.length > 0 && (
+        <Section title={`Past & cancelled (${past.length})`}>
+          <div className="flex flex-col gap-2">
+            {past.slice(0, 10).map((b) => (
+              <div key={b.id} className="rounded-lg border border-black/5 dark:border-white/5 p-3 opacity-50">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-medium text-black dark:text-white">{b.guestName}</p>
+                  {b.status === "cancelled" && (
+                    <span className="text-[10px] text-red-400">Cancelled</span>
+                  )}
+                </div>
+                <p className="text-xs text-black/40 dark:text-white/40">{formatBookingTime(b.startsAt)}</p>
+              </div>
+            ))}
+          </div>
+        </Section>
       )}
     </div>
   );

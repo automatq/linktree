@@ -27,6 +27,13 @@ export type Profile = {
   accentColor?: string;
   bgType?: string;
   bgValue?: string;
+  bookingEnabled?: boolean;
+  bookingTitle?: string;
+  bookingDuration?: number;
+  bookingBuffer?: number;
+  bookingAdvanceDays?: number;
+  bookingEmail?: string;
+  bookingTimezone?: string;
 };
 
 export type LinksData = {

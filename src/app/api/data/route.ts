@@ -38,6 +38,13 @@ export async function GET() {
       accentColor: profile.accentColor,
       bgType: profile.bgType,
       bgValue: profile.bgValue,
+      bookingEnabled: profile.bookingEnabled,
+      bookingTitle: profile.bookingTitle,
+      bookingDuration: profile.bookingDuration,
+      bookingBuffer: profile.bookingBuffer,
+      bookingAdvanceDays: profile.bookingAdvanceDays,
+      bookingEmail: profile.bookingEmail,
+      bookingTimezone: profile.bookingTimezone,
     },
     links: userLinks.map((l) => ({
       id: l.id,
