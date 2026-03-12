@@ -1624,10 +1624,145 @@ function AnalyticsTab({ links }: { links: Link[] }) {
         )}
       </Section>
 
+      <TrackableLinksSection />
+
       <p className="text-center text-[11px] text-black/20 dark:text-white/20">
         CTR = link clicks / total profile views. Data updates in real time.
       </p>
     </div>
+  );
+}
+
+function TrackableLinksSection() {
+  type TrackedLink = { id: string; name: string; destinationUrl: string; clicks: number };
+  const [links, setLinks] = useState<TrackedLink[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const appHost = typeof window !== "undefined" ? window.location.origin : "";
+
+  useEffect(() => {
+    fetch("/api/admin/tracked-links")
+      .then((r) => r.json())
+      .then((d) => { setLinks(d.links ?? []); setLoading(false); });
+  }, []);
+
+  async function create() {
+    if (!name.trim() || !url.trim()) return;
+    setCreating(true);
+    const res = await fetch("/api/admin/tracked-links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, destinationUrl: url }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      setLinks((prev) => [...prev, { ...d }]);
+      setName("");
+      setUrl("");
+    }
+    setCreating(false);
+  }
+
+  async function remove(id: string) {
+    await fetch("/api/admin/tracked-links", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setLinks((prev) => prev.filter((l) => l.id !== id));
+  }
+
+  function copy(id: string) {
+    navigator.clipboard.writeText(`${appHost}/t/${id}`);
+    setCopied(id);
+    setTimeout(() => setCopied(null), 2000);
+  }
+
+  const maxClicks = Math.max(...links.map((l) => l.clicks), 1);
+
+  return (
+    <Section
+      title="Trackable Links"
+      action={<span className="text-[10px] text-black/30 dark:text-white/30">Named short links with click tracking</span>}
+    >
+      <div className="flex flex-col gap-4">
+        {/* Create form */}
+        <div className="flex flex-col gap-2">
+          <div className="flex gap-2">
+            <input
+              className="h-8 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+              placeholder="Name (e.g. Instagram Bio)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <input
+              className="h-8 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+              placeholder="Destination URL"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            <button
+              onClick={create}
+              disabled={creating || !name.trim() || !url.trim()}
+              className="flex h-8 items-center rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-40"
+            >
+              {creating ? "..." : "Create"}
+            </button>
+          </div>
+        </div>
+
+        {/* Links list */}
+        {loading ? (
+          <p className="text-xs text-black/30 dark:text-white/30">Loading...</p>
+        ) : links.length === 0 ? (
+          <p className="text-xs text-black/30 dark:text-white/30">No trackable links yet. Create one above.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {links.map((link) => (
+              <div key={link.id} className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs font-medium text-black/70 dark:text-white/70 truncate">{link.name}</span>
+                      <span className="text-xs text-black/40 dark:text-white/40 ml-2 shrink-0">{link.clicks.toLocaleString()} clicks</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                      <div className="h-full rounded-full bg-black/20 dark:bg-white/20 transition-all" style={{ width: `${(link.clicks / maxClicks) * 100}%` }} />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono text-[10px] text-black/30 dark:text-white/30 truncate flex-1">{appHost}/t/{link.id}</span>
+                  <button
+                    onClick={() => copy(link.id)}
+                    className="shrink-0 flex items-center gap-1 text-[10px] text-black/30 dark:text-white/30 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    {copied === link.id ? (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    ) : (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    )}
+                    {copied === link.id ? "Copied" : "Copy"}
+                  </button>
+                  <span className="text-black/10 dark:text-white/10">|</span>
+                  <span className="text-[10px] text-black/25 dark:text-white/25 truncate max-w-[120px]">{link.destinationUrl}</span>
+                  <button
+                    onClick={() => remove(link.id)}
+                    className="shrink-0 text-[10px] text-black/20 dark:text-white/20 hover:text-red-400 transition-colors ml-auto"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Section>
   );
 }
 

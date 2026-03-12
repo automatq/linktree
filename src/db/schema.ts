@@ -80,6 +80,25 @@ export const profileViews = pgTable("profile_views", {
   country: text("country").notNull().default(""),
 });
 
+// Trackable links (named short links for external use)
+export const trackedLinks = pgTable("tracked_links", {
+  id: text("id").primaryKey(), // short random code e.g. "abc1234"
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  name: text("name").notNull().default(""),
+  destinationUrl: text("destination_url").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const trackedLinkClicks = pgTable("tracked_link_clicks", {
+  id: serial("id").primaryKey(),
+  trackedLinkId: text("tracked_link_id").notNull(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  clickedAt: timestamp("clicked_at").defaultNow(),
+  referrer: text("referrer").notNull().default(""),
+  device: text("device").notNull().default(""),
+  country: text("country").notNull().default(""),
+});
+
 // Weekly recurring availability windows
 export const availability = pgTable("availability", {
   id: serial("id").primaryKey(),
