@@ -609,8 +609,8 @@ function Textarea({
     <textarea
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      rows={2}
-      className="w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2 text-sm text-black dark:text-white placeholder-black/20 dark:placeholder-white/20 outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors resize-none"
+      rows={3}
+      className="w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2 text-sm text-black dark:text-white placeholder-black/20 dark:placeholder-white/20 outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors resize-y"
     />
   );
 }
