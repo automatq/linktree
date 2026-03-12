@@ -324,11 +324,11 @@ export function BookingClient({ username, hostName, title, duration, accentColor
 
             {/* Slot summary */}
             <div
-              className="rounded-xl p-4 mb-5"
-              style={{ background: accent + "12" }}
+              className={`rounded-xl p-4 mb-5 ${accentColor ? "" : "bg-black/5 dark:bg-white/5"}`}
+              style={accentColor ? { background: accent + "12" } : undefined}
             >
-              <p className="font-semibold text-sm" style={{ color: accent }}>{title}</p>
-              <p className="text-sm mt-0.5" style={{ color: accent + "cc" }}>
+              <p className={`font-semibold text-sm ${accentColor ? "" : "text-black dark:text-white"}`} style={accentColor ? { color: accent } : undefined}>{title}</p>
+              <p className={`text-sm mt-0.5 ${accentColor ? "" : "text-black/60 dark:text-white/60"}`} style={accentColor ? { color: accent + "cc" } : undefined}>
                 {formatSelectedDate(selectedDate)} · {formatSlotLocal(selectedSlot)} – {formatSlotEnd(selectedSlot)}
               </p>
             </div>
@@ -382,8 +382,8 @@ export function BookingClient({ username, hostName, title, duration, accentColor
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-1 w-full rounded-lg py-2.5 text-sm font-semibold text-white transition-opacity disabled:opacity-50"
-                style={{ background: accent }}
+                className={`mt-1 w-full rounded-lg py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50 ${accentColor ? "text-white" : "bg-black dark:bg-white text-white dark:text-black"}`}
+                style={accentColor ? { background: accent } : undefined}
               >
                 {submitting ? "Confirming…" : "Confirm booking"}
               </button>
@@ -395,10 +395,10 @@ export function BookingClient({ username, hostName, title, duration, accentColor
         {step === "confirmed" && selectedSlot && (
           <div className="text-center">
             <div
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full mb-4"
-              style={{ background: accent + "20" }}
+              className={`inline-flex h-12 w-12 items-center justify-center rounded-full mb-4 ${accentColor ? "" : "bg-black/10 dark:bg-white/10"}`}
+              style={accentColor ? { background: accent + "20" } : undefined}
             >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={accentColor ? accent : "currentColor"} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
@@ -406,14 +406,14 @@ export function BookingClient({ username, hostName, title, duration, accentColor
             <p className="text-sm text-black/40 dark:text-white/40 mb-6">A confirmation has been sent to {guestEmail}.</p>
 
             <div
-              className="rounded-xl p-4 text-left mb-6"
-              style={{ background: accent + "10" }}
+              className={`rounded-xl p-4 text-left mb-6 ${accentColor ? "" : "bg-black/5 dark:bg-white/5"}`}
+              style={accentColor ? { background: accent + "10" } : undefined}
             >
-              <p className="font-semibold text-sm" style={{ color: accent }}>{title} with {hostName}</p>
-              <p className="text-sm mt-1" style={{ color: accent + "bb" }}>
+              <p className={`font-semibold text-sm ${accentColor ? "" : "text-black dark:text-white"}`} style={accentColor ? { color: accent } : undefined}>{title} with {hostName}</p>
+              <p className={`text-sm mt-1 ${accentColor ? "" : "text-black/60 dark:text-white/60"}`} style={accentColor ? { color: accent + "bb" } : undefined}>
                 {selectedDate && formatSelectedDate(selectedDate)}
               </p>
-              <p className="text-sm" style={{ color: accent + "bb" }}>
+              <p className={`text-sm ${accentColor ? "" : "text-black/60 dark:text-white/60"}`} style={accentColor ? { color: accent + "bb" } : undefined}>
                 {formatSlotLocal(selectedSlot)} – {formatSlotEnd(selectedSlot)}
               </p>
             </div>
