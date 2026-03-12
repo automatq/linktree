@@ -4,7 +4,7 @@ export type Link = {
   description?: string;
   url: string;
   icon?: string;
-  type?: "link" | "header";
+  type?: "link" | "header" | "embed";
   startsAt?: string | null;
   endsAt?: string | null;
 };

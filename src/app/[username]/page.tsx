@@ -11,6 +11,7 @@ import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
 import { SocialLinks } from "@/components/SocialLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
+import { EmbedCard } from "@/components/EmbedCard";
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +146,10 @@ export default async function ProfilePage({
                   {link.title}
                 </span>
                 <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
+              </div>
+            ) : link.type === "embed" ? (
+              <div key={link.id} className="animate-fade-in-up w-full" style={{ animationDelay: `${i * 60}ms` }}>
+                <EmbedCard link={{ ...link, type: "embed" as const, startsAt: undefined, endsAt: undefined }} />
               </div>
             ) : (
               <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link", startsAt: undefined, endsAt: undefined }} index={i} cardStyle={cardStyle} cardSize={cardSize} accentColor={accentColor} />

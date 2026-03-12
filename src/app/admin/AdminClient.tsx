@@ -5,8 +5,9 @@ import { useClerk } from "@clerk/nextjs";
 import { QRCodeCanvas } from "qrcode.react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { LinksData, Link, SocialLink } from "@/data/links";
+import { getEmbedPlatform } from "@/components/EmbedCard";
 
-const ICONS = ["globe", "zap", "pen", "mail", "calendar", "github", "twitter", "linkedin", "youtube"];
+const ICONS = ["globe", "zap", "pen", "mail", "calendar", "phone", "video", "mappin", "star", "heart", "music", "file", "shop", "mic", "coffee", "github", "twitter", "linkedin", "youtube"];
 
 function genId() {
   return Math.random().toString(36).slice(2, 9);
@@ -95,6 +96,17 @@ export function AdminClient() {
       links: [
         ...data!.links,
         { id: genId(), title: "Section", description: "", url: "", icon: "", type: "header" as const },
+      ],
+    };
+    setData(next);
+  }
+
+  function addEmbed() {
+    const next = {
+      ...data!,
+      links: [
+        ...data!.links,
+        { id: genId(), title: "", description: "", url: "", icon: "", type: "embed" as const },
       ],
     };
     setData(next);
@@ -297,6 +309,12 @@ export function AdminClient() {
                     <span className="text-base leading-none">+</span> Add section
                   </button>
                   <button
+                    onClick={addEmbed}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add embed
+                  </button>
+                  <button
                     onClick={addLink}
                     className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
                   >
@@ -309,6 +327,16 @@ export function AdminClient() {
                 {data.links.map((link, i) =>
                   link.type === "header" ? (
                     <SectionRow
+                      key={link.id}
+                      link={link}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : link.type === "embed" ? (
+                    <EmbedRow
                       key={link.id}
                       link={link}
                       isFirst={i === 0}
@@ -404,7 +432,7 @@ function AnalyticsTab({ links }: { links: Link[] }) {
     : "—";
 
   const rankedLinks = links
-    .filter((l) => l.type !== "header")
+    .filter((l) => l.type !== "header" && l.type !== "embed")
     .map((l) => ({ id: l.id, title: l.title, count: localStats.byLink[l.id] ?? 0 }))
     .sort((a, b) => b.count - a.count);
 
@@ -797,6 +825,72 @@ function LinkRow({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function EmbedRow({
+  link,
+  isFirst,
+  isLast,
+  onChange,
+  onDelete,
+  onMove,
+}: {
+  link: Link;
+  isFirst: boolean;
+  isLast: boolean;
+  onChange: (field: string, value: string | null) => void;
+  onDelete: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  const platform = getEmbedPlatform(link.url);
+  const platformLabel: Record<string, string> = { youtube: "YouTube", spotify: "Spotify", tweet: "Tweet" };
+
+  return (
+    <div className="rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-black p-3 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-0.5">
+          <button
+            onClick={() => onMove(-1)}
+            disabled={isFirst}
+            className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L1 7h8L5 2z" fill="currentColor" /></svg>
+          </button>
+          <button
+            onClick={() => onMove(1)}
+            disabled={isLast}
+            className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L1 3h8L5 8z" fill="currentColor" /></svg>
+          </button>
+        </div>
+
+        <div className="flex-1 flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Input value={link.url} onChange={(v) => onChange("url", v)} placeholder="Paste Spotify, YouTube, or tweet URL" />
+            {platform ? (
+              <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-black/8 dark:bg-white/8 text-black/50 dark:text-white/50">
+                {platformLabel[platform]}
+              </span>
+            ) : link.url ? (
+              <span className="shrink-0 text-[10px] text-red-500/60 dark:text-red-400/60">unrecognized</span>
+            ) : null}
+          </div>
+          <Input value={link.title} onChange={(v) => onChange("title", v)} placeholder="Label (optional)" />
+        </div>
+
+        <button
+          onClick={onDelete}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-black/40 hover:bg-red-50 hover:text-red-500 dark:text-white/40 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 }

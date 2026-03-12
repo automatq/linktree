@@ -115,7 +115,7 @@ export async function POST(req: Request) {
         title: l.title,
         description: l.description || "",
         url: l.type === "header" ? "" : (l.url || "#"),
-        icon: l.type === "header" ? "" : (l.icon || "globe"),
+        icon: (l.type === "header" || l.type === "embed") ? "" : (l.icon || "globe"),
         position: i,
         type: l.type || "link",
         startsAt: l.startsAt ? new Date(l.startsAt) : null,
