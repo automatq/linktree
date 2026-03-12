@@ -103,9 +103,20 @@ export default async function ProfilePage({
   const fontFamily = fontMap[profile.font ?? "mono"] ?? fontMap.mono;
 
   return (
-    <div className={`min-h-screen transition-colors duration-200 ${hasBg ? "" : "bg-white dark:bg-black"}`} style={{ fontFamily, ...bgStyle }}>
+    <div className={`min-h-screen transition-colors duration-200 ${hasBg ? "" : "bg-white dark:bg-black"}`} style={{ fontFamily }}>
+      {/* Background layer — always behind everything */}
+      {hasBg && (
+        <div
+          className="fixed inset-0 -z-10 pointer-events-none"
+          style={
+            bgType === "image"
+              ? { backgroundImage: `url(${bgValue})`, backgroundSize: "cover", backgroundPosition: "center" }
+              : { background: bgValue }
+          }
+        />
+      )}
       <div
-        className="fixed inset-0 pointer-events-none"
+        className="fixed inset-0 -z-10 pointer-events-none"
         style={{
           backgroundImage:
             "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
@@ -113,7 +124,7 @@ export default async function ProfilePage({
         }}
       />
       <div
-        className="fixed inset-0 pointer-events-none dark:block hidden"
+        className="fixed inset-0 -z-10 pointer-events-none dark:block hidden"
         style={{
           backgroundImage:
             "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
