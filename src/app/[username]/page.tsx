@@ -9,6 +9,7 @@ import { Avatar } from "@/components/Avatar";
 import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
 import { SocialLinks } from "@/components/SocialLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { CopyLinkButton } from "@/components/CopyLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +96,7 @@ export default async function ProfilePage({
             Edit profile
           </Link>
         )}
+        <CopyLinkButton />
         <ThemeToggle />
       </div>
 
