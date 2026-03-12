@@ -5,14 +5,14 @@ import type { Link } from "@/data/links";
 export type EmbedPlatform = "youtube" | "spotify" | "tweet" | null;
 
 export function getEmbedPlatform(url: string): EmbedPlatform {
-  if (/(?:youtube\.com\/watch\?v=|youtu\.be\/)/.test(url)) return "youtube";
+  if (/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/)/.test(url)) return "youtube";
   if (/open\.spotify\.com\//.test(url)) return "spotify";
   if (/(?:twitter\.com|x\.com)\/[^/]+\/status\//.test(url)) return "tweet";
   return null;
 }
 
 function getYouTubeEmbedUrl(url: string): string | null {
-  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/);
   return m ? `https://www.youtube.com/embed/${m[1]}?rel=0` : null;
 }
 
