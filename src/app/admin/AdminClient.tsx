@@ -800,18 +800,13 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ products: prods }),
       }),
-      fetch("/api/data", {
+      fetch("/api/admin/store", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          profile: {
-            ...profile,
-            emailCaptureEnabled: emailEnabled,
-            emailCaptureTitle: emailTitle,
-            emailCaptureButtonText: emailButton,
-          },
-          links: [],
-          socialLinks: [],
+          emailCaptureEnabled: emailEnabled,
+          emailCaptureTitle: emailTitle,
+          emailCaptureButtonText: emailButton,
         }),
       }),
     ]);
