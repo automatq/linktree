@@ -7,7 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import type { LinksData, Link, SocialLink } from "@/data/links";
 import { getEmbedPlatform } from "@/components/EmbedCard";
 
-const ICONS = ["globe", "zap", "pen", "mail", "calendar", "phone", "video", "mappin", "star", "heart", "music", "file", "shop", "mic", "coffee", "github", "twitter", "linkedin", "youtube"];
+const ICONS = ["globe", "zap", "pen", "mail", "calendar", "phone", "video", "mappin", "star", "heart", "music", "file", "shop", "mic", "coffee", "tiktok", "github", "twitter", "linkedin", "youtube"];
 
 function genId() {
   return Math.random().toString(36).slice(2, 9);
