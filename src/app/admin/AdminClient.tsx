@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useClerk } from "@clerk/nextjs";
+import { QRCodeCanvas } from "qrcode.react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { LinksData, Link, SocialLink } from "@/data/links";
 
@@ -25,6 +26,7 @@ export function AdminClient() {
   const [username, setUsername] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [tab, setTab] = useState<"content" | "analytics">("content");
+  const [showQR, setShowQR] = useState(false);
   const { signOut } = useClerk();
 
   useEffect(() => {
@@ -166,9 +168,17 @@ export function AdminClient() {
         <div className="mx-auto flex max-w-2xl items-center justify-between px-4 h-12">
           <div className="flex items-center gap-4">
             {username && (
-              <a href={`/${username}`} target="_blank" className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors">
-                ← Live page
-              </a>
+              <>
+                <a href={`/${username}`} target="_blank" className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors">
+                  ← Live page
+                </a>
+                <button
+                  onClick={() => setShowQR(true)}
+                  className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors"
+                >
+                  QR
+                </button>
+              </>
             )}
             <nav className="flex gap-1">
               {(["content", "analytics"] as const).map((t) => (
@@ -343,6 +353,10 @@ export function AdminClient() {
         )}
 
       </main>
+
+      {showQR && username && (
+        <QRModal username={username} onClose={() => setShowQR(false)} />
+      )}
     </div>
   );
 }
@@ -1074,6 +1088,74 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (v: string)
           className="sr-only"
         />
       </label>
+    </div>
+  );
+}
+
+// ── QR Modal ─────────────────────────────────────────────────────────────────
+
+function QRModal({ username, onClose }: { username: string; onClose: () => void }) {
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const profileUrl = typeof window !== "undefined"
+    ? `${window.location.origin}/${username}`
+    : `/${username}`;
+
+  function download() {
+    const canvas = canvasRef.current?.querySelector("canvas");
+    if (!canvas) return;
+    const url = canvas.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${username}-qr.png`;
+    a.click();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-black border border-black/10 dark:border-white/10 rounded-2xl p-8 flex flex-col items-center gap-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between w-full">
+          <h2 className="text-sm font-medium text-black dark:text-white">QR Code</h2>
+          <button
+            onClick={onClose}
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-black/30 hover:text-black dark:text-white/30 dark:hover:text-white transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        <div ref={canvasRef} className="p-4 bg-white rounded-xl">
+          <QRCodeCanvas
+            value={profileUrl}
+            size={200}
+            marginSize={0}
+            level="M"
+            bgColor="#ffffff"
+            fgColor="#000000"
+          />
+        </div>
+
+        <p className="text-xs text-black/30 dark:text-white/30 font-mono">{profileUrl}</p>
+
+        <button
+          onClick={download}
+          className="flex h-8 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-4 text-xs font-medium text-white dark:text-black hover:opacity-80 transition-opacity"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Download PNG
+        </button>
+      </div>
     </div>
   );
 }
