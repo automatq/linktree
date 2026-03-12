@@ -365,7 +365,7 @@ export function AdminClient() {
 // ── Analytics Tab ────────────────────────────────────────────────────────────
 
 function AnalyticsTab({ links }: { links: Link[] }) {
-  const [days, setDays] = useState<7 | 14 | 30>(14);
+  const [days, setDays] = useState<7 | 14>(14);
   const [localStats, setLocalStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -404,7 +404,7 @@ function AnalyticsTab({ links }: { links: Link[] }) {
     <div className="flex flex-col gap-8">
       {/* Range toggle */}
       <div className="flex items-center justify-end gap-1">
-        {([7, 14, 30] as const).map((d) => (
+        {([7, 14] as const).map((d) => (
           <button
             key={d}
             onClick={() => setDays(d)}

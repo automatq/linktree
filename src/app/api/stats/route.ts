@@ -10,7 +10,7 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const daysParam = parseInt(url.searchParams.get("days") ?? "14", 10);
-  const days = [7, 14, 30].includes(daysParam) ? daysParam : 14;
+  const days = [7, 14].includes(daysParam) ? daysParam : 14;
 
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.userId, userId),
