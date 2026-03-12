@@ -14,6 +14,7 @@ import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { EmbedCard } from "@/components/EmbedCard";
 import { ProductCard } from "@/components/ProductCard";
 import { EmailCaptureWidget } from "@/components/EmailCaptureWidget";
+import { BookingClient } from "@/app/book/[username]/BookingClient";
 
 export const dynamic = "force-dynamic";
 
@@ -154,6 +155,17 @@ export default async function ProfilePage({
             ) : link.type === "embed" ? (
               <div key={link.id} className="animate-fade-in-up w-full" style={{ animationDelay: `${i * 60}ms` }}>
                 <EmbedCard link={{ ...link, type: "embed" as const, startsAt: undefined, endsAt: undefined }} />
+              </div>
+            ) : link.type === "booking" && profile.bookingEnabled ? (
+              <div key={link.id} className="animate-fade-in-up w-full rounded-xl border border-black/8 dark:border-white/8 overflow-hidden" style={{ animationDelay: `${i * 60}ms` }}>
+                <BookingClient
+                  username={profile.username}
+                  hostName={profile.name || profile.username}
+                  title={profile.bookingTitle || "Book a call"}
+                  duration={profile.bookingDuration ?? 30}
+                  accentColor={accentColor}
+                  isInline
+                />
               </div>
             ) : (
               <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link", startsAt: undefined, endsAt: undefined }} index={i} cardStyle={cardStyle} cardSize={cardSize} accentColor={accentColor} />

@@ -112,6 +112,17 @@ export function AdminClient() {
     setData(next);
   }
 
+  function addBookingWidget() {
+    const next = {
+      ...data!,
+      links: [
+        ...data!.links,
+        { id: genId(), title: "Book a call", description: "", url: "", icon: "", type: "booking" as const },
+      ],
+    };
+    setData(next);
+  }
+
   function deleteLink(id: string) {
     const next = { ...data!, links: data!.links.filter((l) => l.id !== id) };
     setData(next);
@@ -315,6 +326,12 @@ export function AdminClient() {
                     <span className="text-base leading-none">+</span> Add embed
                   </button>
                   <button
+                    onClick={addBookingWidget}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add booking
+                  </button>
+                  <button
                     onClick={addLink}
                     className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
                   >
@@ -342,6 +359,14 @@ export function AdminClient() {
                       isFirst={i === 0}
                       isLast={i === data.links.length - 1}
                       onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : link.type === "booking" ? (
+                    <BookingWidgetRow
+                      key={link.id}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
                       onDelete={() => deleteLink(link.id)}
                       onMove={(dir) => moveLink(link.id, dir)}
                     />
@@ -1152,7 +1177,7 @@ function AnalyticsTab({ links }: { links: Link[] }) {
     : "—";
 
   const rankedLinks = links
-    .filter((l) => l.type !== "header" && l.type !== "embed")
+    .filter((l) => l.type !== "header" && l.type !== "embed" && l.type !== "booking")
     .map((l) => ({ id: l.id, title: l.title, count: localStats.byLink[l.id] ?? 0 }))
     .sort((a, b) => b.count - a.count);
 
@@ -1611,6 +1636,45 @@ function EmbedRow({
           </svg>
         </button>
       </div>
+    </div>
+  );
+}
+
+function BookingWidgetRow({
+  isFirst,
+  isLast,
+  onDelete,
+  onMove,
+}: {
+  isFirst: boolean;
+  isLast: boolean;
+  onDelete: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  return (
+    <div className="rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-black px-3 py-2.5 flex items-center gap-2">
+      <div className="flex flex-col gap-0.5">
+        <button onClick={() => onMove(-1)} disabled={isFirst} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L9 7H1L5 2Z" fill="currentColor" /></svg>
+        </button>
+        <button onClick={() => onMove(1)} disabled={isLast} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L1 3H9L5 8Z" fill="currentColor" /></svg>
+        </button>
+      </div>
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+          </svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-black dark:text-white">Booking calendar</p>
+          <p className="text-[10px] text-black/30 dark:text-white/30">Inline widget — uses your Booking tab settings</p>
+        </div>
+      </div>
+      <button onClick={onDelete} className="shrink-0 text-black/20 hover:text-red-400 dark:text-white/20 dark:hover:text-red-400 transition-colors">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+      </button>
     </div>
   );
 }

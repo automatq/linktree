@@ -14,9 +14,10 @@ type BookingClientProps = {
   duration: number;
   accentColor?: string;
   isEmbed?: boolean;
+  isInline?: boolean;
 };
 
-export function BookingClient({ username, hostName, title, duration, accentColor, isEmbed }: BookingClientProps) {
+export function BookingClient({ username, hostName, title, duration, accentColor, isEmbed, isInline }: BookingClientProps) {
   const [step, setStep] = useState<Step>("calendar");
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [hostTimezone, setHostTimezone] = useState("UTC");
@@ -142,8 +143,8 @@ export function BookingClient({ username, hostName, title, duration, accentColor
   const inputClass = "w-full rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2 text-sm text-black dark:text-white placeholder-black/25 dark:placeholder-white/25 outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors";
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black flex items-start justify-center px-4 py-12">
-      <div className="w-full max-w-sm">
+    <div className={isInline ? "w-full py-2" : "min-h-screen bg-white dark:bg-black flex items-start justify-center px-4 py-12"}>
+      <div className="w-full max-w-sm mx-auto">
         {/* Header */}
         <div className="mb-8 text-center">
           <div

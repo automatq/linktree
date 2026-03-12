@@ -4,7 +4,7 @@ export type Link = {
   description?: string;
   url: string;
   icon?: string;
-  type?: "link" | "header" | "embed";
+  type?: "link" | "header" | "embed" | "booking";
   startsAt?: string | null;
   endsAt?: string | null;
 };
