@@ -34,6 +34,9 @@ export const profiles = pgTable("profiles", {
   bookingSmsNumber: text("booking_sms_number").notNull().default(""),
   socialLinksPosition: text("social_links_position").notNull().default("footer"), // "footer" | "bio"
   customDomain: text("custom_domain").notNull().default(""),
+  tipJarEnabled: boolean("tip_jar_enabled").notNull().default(false),
+  tipJarTitle: text("tip_jar_title").notNull().default("Support my work"),
+  tipJarAmounts: text("tip_jar_amounts").notNull().default("3,5,10,25"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("profiles_custom_domain_idx").on(t.customDomain),

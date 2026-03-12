@@ -15,6 +15,7 @@ import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { EmbedCard } from "@/components/EmbedCard";
 import { ProductCard } from "@/components/ProductCard";
 import { EmailCaptureWidget } from "@/components/EmailCaptureWidget";
+import { TipJarWidget } from "@/components/TipJarWidget";
 import { BookingClient } from "@/app/book/[username]/BookingClient";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 
@@ -227,6 +228,18 @@ export default async function ProfilePage({
               username={profile.username}
               title={profile.emailCaptureTitle || "Stay in the loop"}
               buttonText={profile.emailCaptureButtonText || "Subscribe"}
+              accentColor={accentColor}
+            />
+          </section>
+        )}
+
+        {/* Tip jar */}
+        {profile.tipJarEnabled && (
+          <section className="w-full mt-4">
+            <TipJarWidget
+              username={profile.username}
+              title={profile.tipJarTitle || "Support my work"}
+              amounts={profile.tipJarAmounts || "3,5,10,25"}
               accentColor={accentColor}
             />
           </section>

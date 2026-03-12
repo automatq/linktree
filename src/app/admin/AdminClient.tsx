@@ -1071,6 +1071,9 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
   const [emailEnabled, setEmailEnabled] = useState(profile.emailCaptureEnabled ?? false);
   const [emailTitle, setEmailTitle] = useState(profile.emailCaptureTitle ?? "Stay in the loop");
   const [emailButton, setEmailButton] = useState(profile.emailCaptureButtonText ?? "Subscribe");
+  const [tipEnabled, setTipEnabled] = useState(profile.tipJarEnabled ?? false);
+  const [tipTitle, setTipTitle] = useState(profile.tipJarTitle ?? "Support my work");
+  const [tipAmounts, setTipAmounts] = useState(profile.tipJarAmounts ?? "3,5,10,25");
   const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
   const [loadingSubs, setLoadingSubs] = useState(true);
 
@@ -1156,6 +1159,9 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
           emailCaptureEnabled: emailEnabled,
           emailCaptureTitle: emailTitle,
           emailCaptureButtonText: emailButton,
+          tipJarEnabled: tipEnabled,
+          tipJarTitle: tipTitle,
+          tipJarAmounts: tipAmounts,
         }),
       }),
     ]);
@@ -1370,6 +1376,40 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Button text</label>
                 <input className={inputClass + " w-full"} value={emailButton} onChange={(e) => setEmailButton(e.target.value)} placeholder="Subscribe" />
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* Tip Jar */}
+      <Section title="Tip Jar">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-black dark:text-white">Tip jar widget</p>
+              <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
+                {tipEnabled && username ? (
+                  <>Shows on <a href={`/${username}`} target="_blank" className="underline underline-offset-2">your profile</a></>
+                ) : "Let visitors send you a tip via Stripe"}
+              </p>
+            </div>
+            <button
+              onClick={() => setTipEnabled((v) => !v)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${tipEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${tipEnabled ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+          {tipEnabled && (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Heading</label>
+                <input className={inputClass + " w-full"} value={tipTitle} onChange={(e) => setTipTitle(e.target.value)} placeholder="Support my work" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Preset amounts (comma-separated, USD)</label>
+                <input className={inputClass + " w-full"} value={tipAmounts} onChange={(e) => setTipAmounts(e.target.value)} placeholder="3,5,10,25" />
               </div>
             </div>
           )}

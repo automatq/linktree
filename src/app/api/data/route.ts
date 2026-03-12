@@ -53,6 +53,9 @@ export async function GET() {
       bookingSmsNumber: profile.bookingSmsNumber,
       socialLinksPosition: profile.socialLinksPosition as "footer" | "bio",
       customDomain: profile.customDomain,
+      tipJarEnabled: profile.tipJarEnabled,
+      tipJarTitle: profile.tipJarTitle,
+      tipJarAmounts: profile.tipJarAmounts,
     },
     links: userLinks.map((l) => ({
       id: l.id,

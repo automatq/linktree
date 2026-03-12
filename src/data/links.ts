@@ -42,6 +42,9 @@ export type Profile = {
   bookingSmsNumber?: string;
   socialLinksPosition?: "footer" | "bio";
   customDomain?: string;
+  tipJarEnabled?: boolean;
+  tipJarTitle?: string;
+  tipJarAmounts?: string;
 };
 
 export type Product = {
