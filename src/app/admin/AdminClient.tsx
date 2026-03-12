@@ -264,6 +264,50 @@ export function AdminClient() {
 
         {tab === "content" && (
           <>
+            {/* Profile section */}
+            <Section title="Profile" action={
+              <div className="flex items-center gap-2">
+                <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+                <button
+                  onClick={() => save(data!)}
+                  disabled={saving}
+                  className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            }>
+              <div className="flex gap-4 items-start">
+                <AvatarUpload
+                  avatarUrl={data.profile.avatarUrl}
+                  initials={data.profile.avatarInitials}
+                  onUploaded={(url) => {
+                    const next = { ...data, profile: { ...data.profile, avatarUrl: url } };
+                    setData(next);
+                  }}
+                />
+                <div className="flex-1 flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Name">
+                      <Input value={data.profile.name} onChange={(v) => updateProfile("name", v)} />
+                    </Field>
+                    <Field label="Username">
+                      <Input value={data.profile.username} onChange={(v) => updateProfile("username", v)} />
+                    </Field>
+                    <Field label="Avatar Initials">
+                      <Input value={data.profile.avatarInitials} onChange={(v) => updateProfile("avatarInitials", v)} maxLength={3} />
+                    </Field>
+                  </div>
+                  <Field label="Bio">
+                    <Textarea value={data.profile.bio} onChange={(v) => updateProfile("bio", v)} />
+                  </Field>
+                  <Field label="Font Style">
+                    <FontPicker value={data.profile.font ?? "mono"} onChange={(v) => updateProfile("font", v)} />
+                  </Field>
+                </div>
+              </div>
+            </Section>
+
             {/* Templates section */}
             <Section title="Templates">
               <div className="flex flex-col gap-3">
@@ -310,50 +354,6 @@ export function AdminClient() {
                       <span className="mt-1 text-[10px] font-semibold tracking-wide opacity-60">{tpl.name}</span>
                     </button>
                   ))}
-                </div>
-              </div>
-            </Section>
-
-            {/* Profile section */}
-            <Section title="Profile" action={
-              <div className="flex items-center gap-2">
-                <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-                <button
-                  onClick={() => save(data!)}
-                  disabled={saving}
-                  className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              </div>
-            }>
-              <div className="flex gap-4 items-start">
-                <AvatarUpload
-                  avatarUrl={data.profile.avatarUrl}
-                  initials={data.profile.avatarInitials}
-                  onUploaded={(url) => {
-                    const next = { ...data, profile: { ...data.profile, avatarUrl: url } };
-                    setData(next);
-                  }}
-                />
-                <div className="flex-1 flex flex-col gap-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Name">
-                      <Input value={data.profile.name} onChange={(v) => updateProfile("name", v)} />
-                    </Field>
-                    <Field label="Username">
-                      <Input value={data.profile.username} onChange={(v) => updateProfile("username", v)} />
-                    </Field>
-                    <Field label="Avatar Initials">
-                      <Input value={data.profile.avatarInitials} onChange={(v) => updateProfile("avatarInitials", v)} maxLength={3} />
-                    </Field>
-                  </div>
-                  <Field label="Bio">
-                    <Textarea value={data.profile.bio} onChange={(v) => updateProfile("bio", v)} />
-                  </Field>
-                  <Field label="Font Style">
-                    <FontPicker value={data.profile.font ?? "mono"} onChange={(v) => updateProfile("font", v)} />
-                  </Field>
                 </div>
               </div>
             </Section>
