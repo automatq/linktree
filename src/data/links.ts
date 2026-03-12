@@ -49,6 +49,12 @@ export type Profile = {
   tiktokPixelId?: string;
   googleTagId?: string;
   webhookUrl?: string;
+  heroEnabled?: boolean;
+  heroImageUrl?: string;
+  heroHeadline?: string;
+  heroSubtitle?: string;
+  heroCtaText?: string;
+  heroCtaUrl?: string;
 };
 
 export type Product = {

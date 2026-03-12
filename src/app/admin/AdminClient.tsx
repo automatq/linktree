@@ -48,6 +48,15 @@ export function AdminClient() {
   const [webhookSaved, setWebhookSaved] = useState(false);
   const [webhookTesting, setWebhookTesting] = useState(false);
   const [webhookTestResult, setWebhookTestResult] = useState<string | null>(null);
+  const [heroEnabled, setHeroEnabled] = useState(false);
+  const [heroImageUrl, setHeroImageUrl] = useState("");
+  const [heroHeadline, setHeroHeadline] = useState("");
+  const [heroSubtitle, setHeroSubtitle] = useState("");
+  const [heroCtaText, setHeroCtaText] = useState("");
+  const [heroCtaUrl, setHeroCtaUrl] = useState("");
+  const [heroSaving, setHeroSaving] = useState(false);
+  const [heroSaved, setHeroSaved] = useState(false);
+  const [heroUploading, setHeroUploading] = useState(false);
   const { signOut } = useClerk();
 
   const checkDomainStatus = useCallback(async (domain: string) => {
@@ -81,6 +90,12 @@ export function AdminClient() {
       if (d.profile?.tiktokPixelId) setTiktokPixelId(d.profile.tiktokPixelId);
       if (d.profile?.googleTagId) setGoogleTagId(d.profile.googleTagId);
       if (d.profile?.webhookUrl) setWebhookUrl(d.profile.webhookUrl);
+      setHeroEnabled(d.profile?.heroEnabled ?? false);
+      if (d.profile?.heroImageUrl) setHeroImageUrl(d.profile.heroImageUrl);
+      if (d.profile?.heroHeadline) setHeroHeadline(d.profile.heroHeadline);
+      if (d.profile?.heroSubtitle) setHeroSubtitle(d.profile.heroSubtitle);
+      if (d.profile?.heroCtaText) setHeroCtaText(d.profile.heroCtaText);
+      if (d.profile?.heroCtaUrl) setHeroCtaUrl(d.profile.heroCtaUrl);
       setStats(s);
     });
   }, [checkDomainStatus]);
@@ -418,6 +433,147 @@ export function AdminClient() {
                 onTypeChange={(v) => updateProfile("bgType", v)}
                 onValueChange={(v) => updateProfile("bgValue", v)}
               />
+            </Section>
+
+            {/* Featured Card section */}
+            <Section
+              title="Featured Card"
+              action={
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs transition-all duration-300 ${heroSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+                  <button
+                    onClick={async () => {
+                      setHeroSaving(true);
+                      await fetch("/api/admin/hero", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ heroEnabled, heroImageUrl, heroHeadline, heroSubtitle, heroCtaText, heroCtaUrl }),
+                      });
+                      setHeroSaving(false);
+                      setHeroSaved(true);
+                      setTimeout(() => setHeroSaved(false), 2000);
+                    }}
+                    disabled={heroSaving}
+                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                  >
+                    {heroSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-col gap-4">
+                {/* Enable toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Show featured card</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Appears above your links — great for announcements, latest releases, or promotions</p>
+                  </div>
+                  <button
+                    onClick={() => setHeroEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${heroEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${heroEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {heroEnabled && (
+                  <>
+                    {/* Image upload */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Cover image (optional)</label>
+                      <div className="relative rounded-xl overflow-hidden border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02]" style={{ minHeight: 96 }}>
+                        {heroImageUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={heroImageUrl} alt="" className="w-full h-36 object-cover" />
+                        ) : (
+                          <div className="h-36 flex items-center justify-center text-black/20 dark:text-white/20">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                          </div>
+                        )}
+                        <div className="absolute bottom-2 right-2 flex gap-1.5">
+                          <label className="flex h-7 items-center gap-1.5 rounded-md bg-black/70 dark:bg-white/80 px-2.5 text-[11px] font-medium text-white dark:text-black cursor-pointer hover:bg-black/80 transition-colors">
+                            {heroUploading ? (
+                              <svg className="animate-spin" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                            ) : (
+                              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            )}
+                            {heroUploading ? "Uploading…" : heroImageUrl ? "Replace" : "Upload"}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="sr-only"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setHeroUploading(true);
+                                const form = new FormData();
+                                form.append("file", file);
+                                form.append("purpose", "hero");
+                                const res = await fetch("/api/upload", { method: "POST", body: form });
+                                const { url } = await res.json();
+                                setHeroImageUrl(url);
+                                setHeroUploading(false);
+                              }}
+                            />
+                          </label>
+                          {heroImageUrl && (
+                            <button
+                              onClick={() => setHeroImageUrl("")}
+                              className="flex h-7 items-center rounded-md bg-black/70 dark:bg-white/80 px-2.5 text-[11px] font-medium text-white dark:text-black hover:bg-red-500 dark:hover:bg-red-500 dark:hover:text-white transition-colors"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Text fields */}
+                    <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Headline</label>
+                        <input
+                          className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                          value={heroHeadline}
+                          onChange={(e) => setHeroHeadline(e.target.value)}
+                          placeholder="My new album is out now"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Subtitle (optional)</label>
+                        <input
+                          className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                          value={heroSubtitle}
+                          onChange={(e) => setHeroSubtitle(e.target.value)}
+                          placeholder="Available on all streaming platforms"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Button text (optional)</label>
+                          <input
+                            className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                            value={heroCtaText}
+                            onChange={(e) => setHeroCtaText(e.target.value)}
+                            placeholder="Listen now"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Button URL</label>
+                          <input
+                            className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                            value={heroCtaUrl}
+                            onChange={(e) => setHeroCtaUrl(e.target.value)}
+                            placeholder="https://"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </Section>
 
             {/* Links section */}

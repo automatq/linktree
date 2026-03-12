@@ -19,6 +19,7 @@ import { TipJarWidget } from "@/components/TipJarWidget";
 import { PixelScripts } from "@/components/PixelScripts";
 import { BookingClient } from "@/app/book/[username]/BookingClient";
 import { CountdownCard } from "@/components/CountdownCard";
+import { HeroCard } from "@/components/HeroCard";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
@@ -198,6 +199,20 @@ export default async function ProfilePage({
         </section>
 
         <div className="mb-6 h-px w-full bg-black/5 dark:bg-white/5" />
+
+        {/* Featured hero card */}
+        {profile.heroEnabled && profile.heroHeadline && (
+          <div className="animate-fade-in-up w-full mb-2.5">
+            <HeroCard
+              imageUrl={profile.heroImageUrl || undefined}
+              headline={profile.heroHeadline}
+              subtitle={profile.heroSubtitle || undefined}
+              ctaText={profile.heroCtaText || undefined}
+              ctaUrl={profile.heroCtaUrl || undefined}
+              accentColor={accentColor}
+            />
+          </div>
+        )}
 
         <section className="w-full flex flex-col gap-2.5">
           {visibleLinks.map((link, i) =>

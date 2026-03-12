@@ -60,6 +60,12 @@ export async function GET() {
       tiktokPixelId: profile.tiktokPixelId,
       googleTagId: profile.googleTagId,
       webhookUrl: profile.webhookUrl,
+      heroEnabled: profile.heroEnabled,
+      heroImageUrl: profile.heroImageUrl,
+      heroHeadline: profile.heroHeadline,
+      heroSubtitle: profile.heroSubtitle,
+      heroCtaText: profile.heroCtaText,
+      heroCtaUrl: profile.heroCtaUrl,
     },
     links: userLinks.map((l) => ({
       id: l.id,

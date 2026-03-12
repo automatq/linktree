@@ -43,6 +43,13 @@ export const profiles = pgTable("profiles", {
   googleTagId: text("google_tag_id").notNull().default(""),
   // Webhook / Zapier
   webhookUrl: text("webhook_url").notNull().default(""),
+  // Featured / hero card
+  heroEnabled: boolean("hero_enabled").notNull().default(false),
+  heroImageUrl: text("hero_image_url").notNull().default(""),
+  heroHeadline: text("hero_headline").notNull().default(""),
+  heroSubtitle: text("hero_subtitle").notNull().default(""),
+  heroCtaText: text("hero_cta_text").notNull().default(""),
+  heroCtaUrl: text("hero_cta_url").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("profiles_custom_domain_idx").on(t.customDomain),
