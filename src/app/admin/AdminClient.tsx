@@ -141,7 +141,7 @@ export function AdminClient() {
       ...data!,
       socialLinks: [
         ...data!.socialLinks,
-        { platform: "New Platform", url: "#", icon: "globe" },
+        { platform: genId(), url: "#", icon: "globe" },
       ],
     };
     setData(next);
@@ -963,8 +963,7 @@ function SocialRow({
 }) {
   return (
     <div className="flex items-center gap-2 rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-black p-3">
-      <div className="flex-1 grid grid-cols-[1fr_1fr_auto] gap-2 items-center">
-        <Input value={social.platform} onChange={(v) => onChange("platform", v)} placeholder="Platform" />
+      <div className="flex-1 grid grid-cols-[1fr_auto] gap-2 items-center">
         <Input value={social.url} onChange={(v) => onChange("url", v)} placeholder="https://" />
         <IconSelect value={social.icon} onChange={(v) => onChange("icon", v)} />
       </div>

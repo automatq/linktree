@@ -5,6 +5,7 @@ import type { CardSize } from "./LinkCard";
 type SocialLinksProps = {
   links: SocialLink[];
   size?: CardSize;
+  accentColor?: string;
 };
 
 const SIZE: Record<CardSize, { wrap: string; icon: number }> = {
@@ -14,7 +15,7 @@ const SIZE: Record<CardSize, { wrap: string; icon: number }> = {
   xl: { wrap: "h-12 w-12", icon: 24 },
 };
 
-export function SocialLinks({ links, size = "md" }: SocialLinksProps) {
+export function SocialLinks({ links, size = "md", accentColor }: SocialLinksProps) {
   const s = SIZE[size];
   return (
     <div className="flex items-center gap-1">
@@ -25,7 +26,12 @@ export function SocialLinks({ links, size = "md" }: SocialLinksProps) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={link.platform}
-          className={`flex ${s.wrap} items-center justify-center rounded-lg text-black/30 transition-colors duration-150 hover:bg-black/5 hover:text-black/70 dark:text-white/30 dark:hover:bg-white/5 dark:hover:text-white/80`}
+          className={`flex ${s.wrap} items-center justify-center rounded-lg transition-all duration-150 ${
+            accentColor
+              ? "opacity-40 hover:opacity-100"
+              : "text-black/30 hover:text-black/70 hover:bg-black/5 dark:text-white/30 dark:hover:text-white/80 dark:hover:bg-white/5"
+          }`}
+          style={accentColor ? { color: accentColor } : undefined}
         >
           <Icon name={link.icon} size={s.icon} />
         </a>
