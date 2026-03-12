@@ -18,7 +18,9 @@ import { EmailCaptureWidget } from "@/components/EmailCaptureWidget";
 import { TipJarWidget } from "@/components/TipJarWidget";
 import { PixelScripts } from "@/components/PixelScripts";
 import { BookingClient } from "@/app/book/[username]/BookingClient";
+import { CountdownCard } from "@/components/CountdownCard";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
+import { fetchLatestRssItem } from "@/lib/rss";
 
 export const dynamic = "force-dynamic";
 
@@ -45,14 +47,24 @@ export default async function ProfilePage({
   ]);
   const activeProducts = userProducts.filter((p) => p.active);
 
-  // Filter links by schedule (headers always shown)
+  // Filter links by schedule (headers/countdown/rss always shown)
   const now = new Date();
   const visibleLinks = userLinks.filter((link) => {
-    if (link.type === "header") return true;
+    if (link.type === "header" || link.type === "countdown" || link.type === "rss") return true;
     if (link.startsAt && now < link.startsAt) return false;
     if (link.endsAt && now > link.endsAt) return false;
     return true;
   });
+
+  // Pre-fetch RSS feeds for RSS-type links (server-side, cached 1h)
+  const rssCache: Record<string, { title: string; url: string } | null> = {};
+  await Promise.all(
+    visibleLinks
+      .filter((l) => l.type === "rss" && l.url)
+      .map(async (l) => {
+        rssCache[l.id] = await fetchLatestRssItem(l.url);
+      })
+  );
 
   // Capture tracking data before response is sent
   const reqHeaders = await headers();
@@ -211,6 +223,27 @@ export default async function ProfilePage({
                   isInline
                 />
               </div>
+            ) : link.type === "countdown" && link.url ? (
+              <div key={link.id} className="animate-fade-in-up w-full" style={{ animationDelay: `${i * 60}ms` }}>
+                <CountdownCard
+                  title={link.title}
+                  description={link.description || undefined}
+                  endDateStr={link.url}
+                  accentColor={accentColor}
+                />
+              </div>
+            ) : link.type === "rss" ? (
+              rssCache[link.id] ? (
+                <div key={link.id} className="animate-fade-in-up w-full" style={{ animationDelay: `${i * 60}ms` }}>
+                  <LinkCard
+                    link={{ ...link, title: link.title || rssCache[link.id]!.title, url: rssCache[link.id]!.url, type: "link" as const, icon: "globe", startsAt: undefined, endsAt: undefined }}
+                    index={i}
+                    cardStyle={cardStyle}
+                    cardSize={cardSize}
+                    accentColor={accentColor}
+                  />
+                </div>
+              ) : null
             ) : (
               <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link", startsAt: undefined, endsAt: undefined }} index={i} cardStyle={cardStyle} cardSize={cardSize} accentColor={accentColor} />
             )

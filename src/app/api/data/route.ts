@@ -59,6 +59,7 @@ export async function GET() {
       metaPixelId: profile.metaPixelId,
       tiktokPixelId: profile.tiktokPixelId,
       googleTagId: profile.googleTagId,
+      webhookUrl: profile.webhookUrl,
     },
     links: userLinks.map((l) => ({
       id: l.id,
@@ -138,7 +139,7 @@ export async function POST(req: Request) {
         title: l.title,
         description: l.description || "",
         url: (l.type === "header" || l.type === "booking") ? "" : (l.url || ""),
-        icon: (l.type === "header" || l.type === "embed" || l.type === "booking") ? "" : (l.icon || "globe"),
+        icon: (l.type === "header" || l.type === "embed" || l.type === "booking" || l.type === "countdown" || l.type === "rss") ? "" : (l.icon || "globe"),
         position: i,
         type: l.type || "link",
         startsAt: l.startsAt ? new Date(l.startsAt) : null,

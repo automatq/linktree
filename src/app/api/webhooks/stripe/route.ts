@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { db } from "@/db";
-import { orders, products } from "@/db/schema";
+import { orders, products, profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { Resend } from "resend";
+import { fireWebhook } from "@/lib/webhook";
 
 export async function POST(req: Request) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
@@ -41,6 +42,18 @@ export async function POST(req: Request) {
       const product = await db.query.products.findFirst({
         where: eq(products.id, order.productId),
       });
+
+      // Fire webhook to profile owner
+      const profile = await db.query.profiles.findFirst({ where: eq(profiles.id, order.profileId) });
+      if (profile?.webhookUrl) {
+        await fireWebhook(profile.webhookUrl, "order.paid", {
+          username: profile.username,
+          orderId: order.id,
+          productId: order.productId,
+          guestEmail: session.customer_details?.email || "",
+          guestName: session.customer_details?.name || "",
+        });
+      }
 
       if (product?.fileUrl && session.customer_details?.email && process.env.RESEND_API_KEY) {
         const resend = new Resend(process.env.RESEND_API_KEY);

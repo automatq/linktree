@@ -4,7 +4,7 @@ export type Link = {
   description?: string;
   url: string;
   icon?: string;
-  type?: "link" | "header" | "embed" | "booking";
+  type?: "link" | "header" | "embed" | "booking" | "countdown" | "rss";
   startsAt?: string | null;
   endsAt?: string | null;
 };
@@ -48,6 +48,7 @@ export type Profile = {
   metaPixelId?: string;
   tiktokPixelId?: string;
   googleTagId?: string;
+  webhookUrl?: string;
 };
 
 export type Product = {

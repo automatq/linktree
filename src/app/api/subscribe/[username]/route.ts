@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { db } from "@/db";
 import { profiles, subscribers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { fireWebhook } from "@/lib/webhook";
 
 function genId() {
   return Math.random().toString(36).slice(2, 11) + Math.random().toString(36).slice(2, 11);
@@ -38,6 +39,18 @@ export async function POST(
       email: email.toLowerCase().trim(),
       name: name?.trim() || "",
     });
+
+    // Fire webhook after response is sent — no latency impact
+    const webhookUrl = profile.webhookUrl;
+    if (webhookUrl) {
+      after(() =>
+        fireWebhook(webhookUrl, "subscriber.created", {
+          username: profile.username,
+          email: email.toLowerCase().trim(),
+          name: name?.trim() || "",
+        })
+      );
+    }
   }
 
   return NextResponse.json({ ok: true });

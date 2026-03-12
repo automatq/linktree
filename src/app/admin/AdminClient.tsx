@@ -43,6 +43,11 @@ export function AdminClient() {
   const [googleTagId, setGoogleTagId] = useState("");
   const [pixelSaving, setPixelSaving] = useState(false);
   const [pixelSaved, setPixelSaved] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhookSaving, setWebhookSaving] = useState(false);
+  const [webhookSaved, setWebhookSaved] = useState(false);
+  const [webhookTesting, setWebhookTesting] = useState(false);
+  const [webhookTestResult, setWebhookTestResult] = useState<string | null>(null);
   const { signOut } = useClerk();
 
   const checkDomainStatus = useCallback(async (domain: string) => {
@@ -75,6 +80,7 @@ export function AdminClient() {
       if (d.profile?.metaPixelId) setMetaPixelId(d.profile.metaPixelId);
       if (d.profile?.tiktokPixelId) setTiktokPixelId(d.profile.tiktokPixelId);
       if (d.profile?.googleTagId) setGoogleTagId(d.profile.googleTagId);
+      if (d.profile?.webhookUrl) setWebhookUrl(d.profile.webhookUrl);
       setStats(s);
     });
   }, [checkDomainStatus]);
@@ -154,6 +160,29 @@ export function AdminClient() {
       links: [
         ...data!.links,
         { id: genId(), title: "Book a call", description: "", url: "", icon: "", type: "booking" as const },
+      ],
+    };
+    setData(next);
+  }
+
+  function addCountdown() {
+    const weekFromNow = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    const next = {
+      ...data!,
+      links: [
+        ...data!.links,
+        { id: genId(), title: "Coming soon", description: "", url: weekFromNow, icon: "", type: "countdown" as const },
+      ],
+    };
+    setData(next);
+  }
+
+  function addRss() {
+    const next = {
+      ...data!,
+      links: [
+        ...data!.links,
+        { id: genId(), title: "Latest post", description: "", url: "", icon: "", type: "rss" as const },
       ],
     };
     setData(next);
@@ -395,30 +424,42 @@ export function AdminClient() {
             <Section
               title="Links"
               action={
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     onClick={addSection}
                     className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
                   >
-                    <span className="text-base leading-none">+</span> Add section
+                    <span className="text-base leading-none">+</span> Section
                   </button>
                   <button
                     onClick={addEmbed}
                     className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
                   >
-                    <span className="text-base leading-none">+</span> Add embed
+                    <span className="text-base leading-none">+</span> Embed
                   </button>
                   <button
                     onClick={addBookingWidget}
                     className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
                   >
-                    <span className="text-base leading-none">+</span> Add booking
+                    <span className="text-base leading-none">+</span> Booking
+                  </button>
+                  <button
+                    onClick={addCountdown}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Countdown
+                  </button>
+                  <button
+                    onClick={addRss}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> RSS
                   </button>
                   <button
                     onClick={addLink}
                     className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
                   >
-                    <span className="text-base leading-none">+</span> Add link
+                    <span className="text-base leading-none">+</span> Link
                   </button>
                 </div>
               }
@@ -450,6 +491,26 @@ export function AdminClient() {
                       key={link.id}
                       isFirst={i === 0}
                       isLast={i === data.links.length - 1}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : link.type === "countdown" ? (
+                    <CountdownRow
+                      key={link.id}
+                      link={link}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : link.type === "rss" ? (
+                    <RssRow
+                      key={link.id}
+                      link={link}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
                       onDelete={() => deleteLink(link.id)}
                       onMove={(dir) => moveLink(link.id, dir)}
                     />
@@ -723,6 +784,87 @@ export function AdminClient() {
                     />
                   </div>
                 ))}
+              </div>
+            </Section>
+            <Section
+              title="Webhooks / Zapier"
+              action={
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs transition-all duration-300 ${webhookSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+                  <button
+                    onClick={async () => {
+                      setWebhookSaving(true);
+                      await fetch("/api/admin/webhook", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ webhookUrl }),
+                      });
+                      setWebhookSaving(false);
+                      setWebhookSaved(true);
+                      setTimeout(() => setWebhookSaved(false), 2000);
+                    }}
+                    disabled={webhookSaving}
+                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                  >
+                    {webhookSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-black/40 dark:text-white/40">
+                  Add a webhook URL and we&apos;ll POST a JSON payload whenever a new subscriber, booking, tip, or order comes in. Works with Zapier, Make, n8n, and any HTTP endpoint.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    className="h-8 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors font-mono"
+                    value={webhookUrl}
+                    onChange={(e) => { setWebhookUrl(e.target.value); setWebhookTestResult(null); }}
+                    placeholder="https://hooks.zapier.com/hooks/catch/..."
+                  />
+                  <button
+                    disabled={!webhookUrl.trim() || webhookTesting}
+                    onClick={async () => {
+                      setWebhookTesting(true);
+                      setWebhookTestResult(null);
+                      try {
+                        await fetch(webhookUrl, {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ event: "test", timestamp: new Date().toISOString(), data: { message: "TriLink webhook test" } }),
+                        });
+                        setWebhookTestResult("ok");
+                      } catch {
+                        setWebhookTestResult("error");
+                      }
+                      setWebhookTesting(false);
+                    }}
+                    className="flex h-8 items-center rounded-lg border border-black/10 dark:border-white/10 px-3 text-xs text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors disabled:opacity-40"
+                  >
+                    {webhookTesting ? "Sending…" : "Test"}
+                  </button>
+                </div>
+                {webhookTestResult === "ok" && (
+                  <p className="text-xs text-emerald-500">Test sent — check your endpoint for the payload.</p>
+                )}
+                {webhookTestResult === "error" && (
+                  <p className="text-xs text-red-500">Request failed — check the URL and try again.</p>
+                )}
+                <div className="rounded-lg bg-black/[0.03] dark:bg-white/[0.03] p-3 text-[11px] text-black/50 dark:text-white/50 flex flex-col gap-1.5">
+                  <p className="font-medium text-black/60 dark:text-white/60">Events fired:</p>
+                  {[
+                    { event: "subscriber.created", desc: "New email subscriber" },
+                    { event: "booking.created", desc: "New booking confirmed" },
+                    { event: "tip.received", desc: "Tip payment completed" },
+                    { event: "order.paid", desc: "Digital product purchased" },
+                  ].map(({ event, desc }) => (
+                    <div key={event} className="flex items-center gap-2">
+                      <span className="font-mono text-black/40 dark:text-white/40">{event}</span>
+                      <span className="text-black/25 dark:text-white/25">—</span>
+                      <span>{desc}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </Section>
           </>
@@ -1556,7 +1698,7 @@ function AnalyticsTab({ links }: { links: Link[] }) {
     : "—";
 
   const rankedLinks = links
-    .filter((l) => l.type !== "header" && l.type !== "embed" && l.type !== "booking")
+    .filter((l) => l.type !== "header" && l.type !== "embed" && l.type !== "booking" && l.type !== "countdown" && l.type !== "rss")
     .map((l) => ({ id: l.id, title: l.title, count: localStats.byLink[l.id] ?? 0 }))
     .sort((a, b) => b.count - a.count);
 
@@ -2273,6 +2415,112 @@ function BookingWidgetRow({
       <button onClick={onDelete} className="shrink-0 text-black/20 hover:text-red-400 dark:text-white/20 dark:hover:text-red-400 transition-colors">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
       </button>
+    </div>
+  );
+}
+
+function CountdownRow({
+  link,
+  isFirst,
+  isLast,
+  onChange,
+  onDelete,
+  onMove,
+}: {
+  link: Link;
+  isFirst: boolean;
+  isLast: boolean;
+  onChange: (field: string, value: string | null) => void;
+  onDelete: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  // url stores the ISO end-datetime; title is the label; description is optional subtitle
+  function toDatetimeLocalValue(iso: string): string {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  return (
+    <div className="rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-black p-3 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-0.5">
+          <button onClick={() => onMove(-1)} disabled={isFirst} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L1 7h8L5 2z" fill="currentColor" /></svg>
+          </button>
+          <button onClick={() => onMove(1)} disabled={isLast} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L1 3h8L5 8z" fill="currentColor" /></svg>
+          </button>
+        </div>
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+          </svg>
+        </div>
+        <div className="flex-1 flex flex-col gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Input value={link.title} onChange={(v) => onChange("title", v)} placeholder="Label (e.g. Sale ends)" />
+            <div className="flex flex-col gap-1">
+              <input
+                type="datetime-local"
+                value={toDatetimeLocalValue(link.url)}
+                onChange={(e) => onChange("url", e.target.value ? new Date(e.target.value).toISOString() : "")}
+                className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+              />
+            </div>
+          </div>
+          <Input value={link.description ?? ""} onChange={(v) => onChange("description", v)} placeholder="Subtitle (optional)" />
+        </div>
+        <button onClick={onDelete} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-black/40 hover:bg-red-50 hover:text-red-500 dark:text-white/40 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RssRow({
+  link,
+  isFirst,
+  isLast,
+  onChange,
+  onDelete,
+  onMove,
+}: {
+  link: Link;
+  isFirst: boolean;
+  isLast: boolean;
+  onChange: (field: string, value: string | null) => void;
+  onDelete: () => void;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  // url stores the RSS feed URL; title is a custom label (uses feed item title if empty)
+  return (
+    <div className="rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-black p-3 flex flex-col gap-2">
+      <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-0.5">
+          <button onClick={() => onMove(-1)} disabled={isFirst} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L1 7h8L5 2z" fill="currentColor" /></svg>
+          </button>
+          <button onClick={() => onMove(1)} disabled={isLast} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20 transition-colors">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L1 3h8L5 8z" fill="currentColor" /></svg>
+          </button>
+        </div>
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M4 11a9 9 0 0 1 9 9" /><path d="M4 4a16 16 0 0 1 16 16" /><circle cx="5" cy="19" r="1" />
+          </svg>
+        </div>
+        <div className="flex-1 flex flex-col gap-2">
+          <Input value={link.url} onChange={(v) => onChange("url", v)} placeholder="RSS feed URL (e.g. https://blog.com/feed.xml)" />
+          <Input value={link.title} onChange={(v) => onChange("title", v)} placeholder="Label — leave blank to use latest item title" />
+        </div>
+        <button onClick={onDelete} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-black/40 hover:bg-red-50 hover:text-red-500 dark:text-white/40 dark:hover:bg-red-500/10 dark:hover:text-red-400 transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+        </button>
+      </div>
     </div>
   );
 }

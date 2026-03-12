@@ -41,6 +41,8 @@ export const profiles = pgTable("profiles", {
   metaPixelId: text("meta_pixel_id").notNull().default(""),
   tiktokPixelId: text("tiktok_pixel_id").notNull().default(""),
   googleTagId: text("google_tag_id").notNull().default(""),
+  // Webhook / Zapier
+  webhookUrl: text("webhook_url").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("profiles_custom_domain_idx").on(t.customDomain),
