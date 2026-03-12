@@ -34,7 +34,7 @@ const STYLES: Record<CardStyle, StyleConfig> = {
   },
   solid: {
     card: "rounded-xl bg-black dark:bg-white hover:opacity-80 active:scale-[0.99]",
-    iconWrap: "bg-white/10 text-white/60 group-hover:bg-white/20 group-hover:text-white dark:bg-black/10 dark:text-black/60 dark:group-hover:bg-black/20 dark:group-hover:text-black",
+    iconWrap: "bg-white/10 text-white group-hover:bg-white/20 dark:bg-black/10 dark:text-black dark:group-hover:bg-black/20",
     title: "text-white dark:text-black",
     desc: "text-white/50 dark:text-black/50",
     arrow: "text-white/30 group-hover:translate-x-0.5 group-hover:text-white/70 dark:text-black/30 dark:group-hover:text-black/70",
@@ -106,11 +106,29 @@ type LinkCardProps = {
   index: number;
   cardStyle?: CardStyle;
   cardSize?: CardSize;
+  accentColor?: string;
 };
 
-export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md" }: LinkCardProps) {
+export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md", accentColor }: LinkCardProps) {
   const s = STYLES[cardStyle] ?? STYLES.minimal;
   const z = SIZES[cardSize] ?? SIZES.md;
+
+  const isSolid = cardStyle === "solid";
+
+  // For solid + accent: override card background with accent, force white text
+  const cardAccentStyle = accentColor && isSolid
+    ? { backgroundColor: accentColor, color: "white" }
+    : undefined;
+
+  // For sharp + accent: tint the left border
+  const sharpAccentStyle = accentColor && cardStyle === "sharp"
+    ? { borderLeftColor: accentColor }
+    : undefined;
+
+  // For non-solid styles + accent: tint icon wrap background and color
+  const iconAccentStyle = accentColor && !isSolid
+    ? { backgroundColor: accentColor + "22", color: accentColor }
+    : undefined;
 
   return (
     <a
@@ -118,10 +136,13 @@ export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md" }
       target="_blank"
       rel="noopener noreferrer"
       className={`animate-fade-in-up group flex items-center ${z.padding} ${z.gap} transition-all duration-200 ${s.card}`}
-      style={{ animationDelay: `${index * 60}ms` }}
+      style={{ animationDelay: `${index * 60}ms`, ...cardAccentStyle, ...sharpAccentStyle }}
     >
       {link.icon && (
-        <span className={`flex ${z.iconWrap} shrink-0 items-center justify-center rounded-lg transition-colors ${s.iconWrap}`}>
+        <span
+          className={`flex ${z.iconWrap} shrink-0 items-center justify-center rounded-lg transition-colors ${s.iconWrap}`}
+          style={iconAccentStyle}
+        >
           <Icon name={link.icon} size={z.iconSize} />
         </span>
       )}

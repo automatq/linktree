@@ -40,6 +40,7 @@ export default async function ProfilePage({
 
   const cardStyle = (profile.cardStyle ?? "minimal") as CardStyle;
   const cardSize = (profile.cardSize ?? "md") as CardSize;
+  const accentColor = profile.accentColor || undefined;
 
   const profileScale: Record<CardSize, {
     avatarSize: number;
@@ -99,7 +100,7 @@ export default async function ProfilePage({
 
       <main className="relative mx-auto flex min-h-screen max-w-md flex-col items-center px-4 py-16">
         <section className={`animate-fade-in-up mb-8 flex flex-col items-center ${ps.gap} text-center`}>
-          <Avatar initials={profile.avatarInitials} avatarUrl={profile.avatarUrl || undefined} size={ps.avatarSize} />
+          <Avatar initials={profile.avatarInitials} avatarUrl={profile.avatarUrl || undefined} size={ps.avatarSize} accentColor={accentColor} />
           <div>
             <h1 className={`${ps.name} font-semibold text-black dark:text-white tracking-tight`}>
               {profile.name}
@@ -125,7 +126,7 @@ export default async function ProfilePage({
                 <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
               </div>
             ) : (
-              <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link" }} index={i} cardStyle={cardStyle} cardSize={cardSize} />
+              <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link" }} index={i} cardStyle={cardStyle} cardSize={cardSize} accentColor={accentColor} />
             )
           )}
         </section>

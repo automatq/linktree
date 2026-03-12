@@ -259,6 +259,11 @@ export function AdminClient() {
               <SizePicker value={data.profile.cardSize ?? "md"} onChange={(v) => updateProfile("cardSize", v)} />
             </Section>
 
+            {/* Accent Color section */}
+            <Section title="Accent Color">
+              <ColorPicker value={data.profile.accentColor ?? ""} onChange={(v) => updateProfile("accentColor", v)} />
+            </Section>
+
             {/* Links section */}
             <Section
               title="Links"
@@ -986,6 +991,89 @@ function SizePicker({ value, onChange }: { value: string; onChange: (v: string) 
           </button>
         );
       })}
+    </div>
+  );
+}
+
+// ── Color Picker ─────────────────────────────────────────────────────────────
+
+const COLOR_PRESETS = [
+  { label: "None",    value: "" },
+  { label: "Gold",    value: "#C9A84C" },
+  { label: "Silver",  value: "#A0A0A8" },
+  { label: "Rose",    value: "#E11D48" },
+  { label: "Orange",  value: "#F97316" },
+  { label: "Amber",   value: "#D97706" },
+  { label: "Emerald", value: "#10B981" },
+  { label: "Blue",    value: "#3B82F6" },
+  { label: "Violet",  value: "#8B5CF6" },
+  { label: "Pink",    value: "#EC4899" },
+];
+
+function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const isCustom = value !== "" && !COLOR_PRESETS.some((p) => p.value === value);
+
+  return (
+    <div className="grid grid-cols-5 gap-2">
+      {COLOR_PRESETS.map((preset) => {
+        const active = value === preset.value;
+        return (
+          <button
+            key={preset.value}
+            onClick={() => onChange(preset.value)}
+            title={preset.label}
+            className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-colors ${
+              active
+                ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
+                : "border-black/8 dark:border-white/8 hover:border-black/20 dark:hover:border-white/20"
+            }`}
+          >
+            <div
+              className="w-full h-6 rounded-md"
+              style={
+                preset.value
+                  ? { backgroundColor: preset.value }
+                  : {
+                      backgroundImage: "repeating-conic-gradient(#e5e7eb 0% 25%, white 0% 50%)",
+                      backgroundSize: "10px 10px",
+                    }
+              }
+            />
+            <span className={`text-[10px] truncate w-full text-center ${active ? "text-black dark:text-white font-medium" : "text-black/40 dark:text-white/40"}`}>
+              {preset.label}
+            </span>
+          </button>
+        );
+      })}
+
+      <label
+        title="Custom color"
+        className={`flex flex-col items-center gap-1.5 p-2 rounded-lg border transition-colors cursor-pointer ${
+          isCustom
+            ? "border-black dark:border-white bg-black/5 dark:bg-white/5"
+            : "border-black/8 dark:border-white/8 hover:border-black/20 dark:hover:border-white/20"
+        }`}
+      >
+        <div
+          className="w-full h-6 rounded-md flex items-center justify-center"
+          style={{ backgroundColor: isCustom ? value : undefined }}
+        >
+          {!isCustom && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-black/30 dark:text-white/30">
+              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z" />
+            </svg>
+          )}
+        </div>
+        <span className={`text-[10px] w-full text-center ${isCustom ? "text-black dark:text-white font-medium" : "text-black/40 dark:text-white/40"}`}>
+          Custom
+        </span>
+        <input
+          type="color"
+          value={isCustom ? value : "#000000"}
+          onChange={(e) => onChange(e.target.value)}
+          className="sr-only"
+        />
+      </label>
     </div>
   );
 }
