@@ -25,6 +25,8 @@ export type Profile = {
   cardStyle?: string;
   cardSize?: string;
   accentColor?: string;
+  bgType?: string;
+  bgValue?: string;
 };
 
 export type LinksData = {

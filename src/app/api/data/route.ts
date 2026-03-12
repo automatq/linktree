@@ -36,6 +36,8 @@ export async function GET() {
       cardStyle: profile.cardStyle,
       cardSize: profile.cardSize,
       accentColor: profile.accentColor,
+      bgType: profile.bgType,
+      bgValue: profile.bgValue,
     },
     links: userLinks.map((l) => ({
       id: l.id,
@@ -79,6 +81,8 @@ export async function POST(req: Request) {
       cardStyle: profileData.cardStyle || "minimal",
       cardSize: profileData.cardSize || "md",
       accentColor: profileData.accentColor || "",
+      bgType: profileData.bgType || "none",
+      bgValue: profileData.bgValue || "",
     }).returning();
     profile = created;
   } else {
@@ -93,6 +97,8 @@ export async function POST(req: Request) {
         cardStyle: profileData.cardStyle || "minimal",
         cardSize: profileData.cardSize || "md",
         accentColor: profileData.accentColor || "",
+        bgType: profileData.bgType || "none",
+        bgValue: profileData.bgValue || "",
       })
       .where(eq(profiles.userId, userId))
       .returning();

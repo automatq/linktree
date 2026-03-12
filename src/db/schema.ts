@@ -12,6 +12,8 @@ export const profiles = pgTable("profiles", {
   cardStyle: text("card_style").notNull().default("minimal"),
   cardSize: text("card_size").notNull().default("md"),
   accentColor: text("accent_color").notNull().default(""),
+  bgType: text("bg_type").notNull().default("none"),
+  bgValue: text("bg_value").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

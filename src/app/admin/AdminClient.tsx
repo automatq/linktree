@@ -275,6 +275,16 @@ export function AdminClient() {
               <ColorPicker value={data.profile.accentColor ?? ""} onChange={(v) => updateProfile("accentColor", v)} />
             </Section>
 
+            {/* Background section */}
+            <Section title="Background">
+              <BgPicker
+                bgType={data.profile.bgType ?? "none"}
+                bgValue={data.profile.bgValue ?? ""}
+                onTypeChange={(v) => updateProfile("bgType", v)}
+                onValueChange={(v) => updateProfile("bgValue", v)}
+              />
+            </Section>
+
             {/* Links section */}
             <Section
               title="Links"
@@ -1247,6 +1257,155 @@ function ColorPicker({ value, onChange }: { value: string; onChange: (v: string)
           className="sr-only"
         />
       </label>
+    </div>
+  );
+}
+
+// ── Background Picker ─────────────────────────────────────────────────────────
+
+const GRADIENT_PRESETS = [
+  { label: "Midnight", value: "linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%)" },
+  { label: "Ocean",    value: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)" },
+  { label: "Dusk",     value: "linear-gradient(135deg, #2c3e50 0%, #4ca1af 100%)" },
+  { label: "Violet",   value: "linear-gradient(135deg, #4a00e0 0%, #8e2de2 100%)" },
+  { label: "Rose",     value: "linear-gradient(135deg, #f953c6 0%, #b91d73 100%)" },
+  { label: "Sunset",   value: "linear-gradient(135deg, #f83600 0%, #f9d423 100%)" },
+  { label: "Forest",   value: "linear-gradient(135deg, #134e5e 0%, #71b280 100%)" },
+  { label: "Mist",     value: "linear-gradient(135deg, #e0eafc 0%, #cfdef3 100%)" },
+  { label: "Steel",    value: "linear-gradient(135deg, #485563 0%, #29323c 100%)" },
+  { label: "Aurora",   value: "linear-gradient(135deg, #00c3ff 0%, #74ee15 100%)" },
+];
+
+function BgPicker({
+  bgType,
+  bgValue,
+  onTypeChange,
+  onValueChange,
+}: {
+  bgType: string;
+  bgValue: string;
+  onTypeChange: (v: string) => void;
+  onValueChange: (v: string) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+
+  async function handleImageFile(file: File) {
+    setUploading(true);
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: form });
+    const { url } = await res.json();
+    onTypeChange("image");
+    onValueChange(url);
+    setUploading(false);
+  }
+
+  const tabs = [
+    { key: "none", label: "None" },
+    { key: "solid", label: "Color" },
+    { key: "gradient", label: "Gradient" },
+    { key: "image", label: "Image" },
+  ] as const;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Type tabs */}
+      <div className="flex gap-1">
+        {tabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => { onTypeChange(t.key); if (t.key === "none") onValueChange(""); }}
+            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+              bgType === t.key
+                ? "bg-black/8 dark:bg-white/8 text-black dark:text-white"
+                : "text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {bgType === "solid" && (
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={bgValue || "#000000"}
+            onChange={(e) => onValueChange(e.target.value)}
+            className="h-8 w-12 rounded-md border border-black/10 dark:border-white/10 cursor-pointer bg-transparent"
+          />
+          <input
+            type="text"
+            value={bgValue}
+            onChange={(e) => onValueChange(e.target.value)}
+            placeholder="#000000"
+            className="h-8 w-32 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+          />
+        </div>
+      )}
+
+      {bgType === "gradient" && (
+        <div className="grid grid-cols-5 gap-2">
+          {GRADIENT_PRESETS.map((g) => (
+            <button
+              key={g.label}
+              onClick={() => onValueChange(g.value)}
+              title={g.label}
+              className={`flex flex-col gap-1.5 p-1.5 rounded-lg border transition-colors ${
+                bgValue === g.value
+                  ? "border-black dark:border-white"
+                  : "border-black/8 dark:border-white/8 hover:border-black/20 dark:hover:border-white/20"
+              }`}
+            >
+              <div className="w-full h-8 rounded-md" style={{ background: g.value }} />
+              <span className={`text-[10px] text-center truncate w-full ${bgValue === g.value ? "text-black dark:text-white font-medium" : "text-black/40 dark:text-white/40"}`}>
+                {g.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {bgType === "image" && (
+        <div className="flex flex-col gap-2">
+          <div
+            className="relative group cursor-pointer h-24 rounded-lg border border-black/10 dark:border-white/10 overflow-hidden flex items-center justify-center bg-black/[0.02] dark:bg-white/[0.02]"
+            onClick={() => inputRef.current?.click()}
+          >
+            {bgValue ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={bgValue} alt="Background" className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <span className="text-xs text-black/30 dark:text-white/30">Click to upload image</span>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+              {uploading ? (
+                <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+              ) : (
+                <span className="text-xs text-white font-medium">Change image</span>
+              )}
+            </div>
+          </div>
+          {bgValue && (
+            <button
+              onClick={() => onValueChange("")}
+              className="self-start text-[10px] text-black/25 dark:text-white/25 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            >
+              Remove image
+            </button>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f); }}
+          />
+        </div>
+      )}
     </div>
   );
 }

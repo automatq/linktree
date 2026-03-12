@@ -1,3 +1,4 @@
+import React from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { after } from "next/server";
@@ -52,6 +53,15 @@ export default async function ProfilePage({
   const cardSize = (profile.cardSize ?? "md") as CardSize;
   const accentColor = profile.accentColor || undefined;
 
+  const bgType = profile.bgType ?? "none";
+  const bgValue = profile.bgValue ?? "";
+  const hasBg = bgType !== "none" && bgValue;
+  const bgStyle: React.CSSProperties = hasBg
+    ? bgType === "image"
+      ? { backgroundImage: `url(${bgValue})`, backgroundSize: "cover", backgroundPosition: "center", backgroundAttachment: "fixed" }
+      : { background: bgValue }
+    : {};
+
   const profileScale: Record<CardSize, {
     avatarSize: number;
     gap: string;
@@ -74,7 +84,7 @@ export default async function ProfilePage({
   const fontFamily = fontMap[profile.font ?? "mono"] ?? fontMap.mono;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black transition-colors duration-200" style={{ fontFamily }}>
+    <div className={`min-h-screen transition-colors duration-200 ${hasBg ? "" : "bg-white dark:bg-black"}`} style={{ fontFamily, ...bgStyle }}>
       <div
         className="fixed inset-0 pointer-events-none"
         style={{
