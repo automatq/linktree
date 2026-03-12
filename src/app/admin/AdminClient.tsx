@@ -15,7 +15,9 @@ function genId() {
 type Stats = {
   byLink: Record<string, number>;
   clicksByDay: Array<{ date: string; count: number }>;
+  viewsByDay: Array<{ date: string; count: number }>;
   totalViews: number;
+  bestDay: { date: string; count: number } | null;
   linkTitles: Record<string, string>;
 };
 
@@ -141,7 +143,6 @@ export function AdminClient() {
     setData(next);
   }
 
-  const totalClicks = stats ? Object.values(stats.byLink).reduce((a, b) => a + b, 0) : 0;
 
   return (
     <div className="min-h-screen bg-white dark:bg-black transition-colors duration-200">
@@ -349,7 +350,7 @@ export function AdminClient() {
         )}
 
         {tab === "analytics" && (
-          <AnalyticsTab stats={stats} totalClicks={totalClicks} links={data.links} />
+          <AnalyticsTab links={data.links} />
         )}
 
       </main>
@@ -363,16 +364,19 @@ export function AdminClient() {
 
 // ── Analytics Tab ────────────────────────────────────────────────────────────
 
-function AnalyticsTab({
-  stats,
-  totalClicks,
-  links,
-}: {
-  stats: Stats | null;
-  totalClicks: number;
-  links: Link[];
-}) {
-  if (!stats) {
+function AnalyticsTab({ links }: { links: Link[] }) {
+  const [days, setDays] = useState<7 | 14 | 30>(14);
+  const [localStats, setLocalStats] = useState<Stats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/stats?days=${days}`)
+      .then((r) => r.json())
+      .then((s) => { setLocalStats(s); setLoading(false); });
+  }, [days]);
+
+  if (loading || !localStats) {
     return (
       <div className="flex items-center justify-center py-20">
         <span className="text-xs text-black/30 dark:text-white/30">Loading analytics…</span>
@@ -380,88 +384,150 @@ function AnalyticsTab({
     );
   }
 
-  const maxDay = Math.max(...stats.clicksByDay.map((d) => d.count), 1);
+  const today = new Date().toISOString().slice(0, 10);
+  const todayClicks = localStats.clicksByDay.find((d) => d.date === today)?.count ?? 0;
+  const totalClicks = localStats.clicksByDay.reduce((a, b) => a + b.count, 0);
+  const rangeLabel = `Last ${days} Days`;
+
+  const bestDayLabel = localStats.bestDay
+    ? new Date(localStats.bestDay.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    : "—";
 
   const rankedLinks = links
     .filter((l) => l.type !== "header")
-    .map((l) => ({ id: l.id, title: l.title, count: stats.byLink[l.id] ?? 0 }))
+    .map((l) => ({ id: l.id, title: l.title, count: localStats.byLink[l.id] ?? 0 }))
     .sort((a, b) => b.count - a.count);
 
   const maxLinkClicks = Math.max(...rankedLinks.map((l) => l.count), 1);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const todayClicks = stats.clicksByDay.find((d) => d.date === today)?.count ?? 0;
-
   return (
     <div className="flex flex-col gap-8">
-      {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <StatCard label="Total clicks" value={totalClicks.toLocaleString()} />
-        <StatCard label="Profile views" value={stats.totalViews.toLocaleString()} />
-        <StatCard label="Today" value={todayClicks.toLocaleString()} />
+      {/* Range toggle */}
+      <div className="flex items-center justify-end gap-1">
+        {([7, 14, 30] as const).map((d) => (
+          <button
+            key={d}
+            onClick={() => setDays(d)}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+              days === d
+                ? "bg-black/8 dark:bg-white/8 text-black dark:text-white"
+                : "text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60"
+            }`}
+          >
+            {d}d
+          </button>
+        ))}
       </div>
 
-      {/* Daily chart */}
-      <Section title="Clicks — Last 14 Days">
-        <div className="flex items-end gap-1.5 h-28 pt-2">
-          {stats.clicksByDay.map((d) => {
-            const height = d.count === 0 ? 2 : Math.max(8, Math.round((d.count / maxDay) * 96));
-            const isToday = d.date === today;
-            const label = d.date.slice(5).replace("-", "/");
-            return (
-              <div key={d.date} className="flex-1 flex flex-col items-center gap-1.5" title={`${d.date}: ${d.count} click${d.count !== 1 ? "s" : ""}`}>
-                <div
-                  className={`w-full rounded-sm transition-all ${isToday ? "bg-black dark:bg-white" : "bg-black/15 dark:bg-white/15"}`}
-                  style={{ height: `${height}px` }}
-                />
-                <span className={`text-[9px] ${isToday ? "text-black/50 dark:text-white/50" : "text-black/20 dark:text-white/20"}`}>
-                  {label}
-                </span>
-              </div>
-            );
-          })}
-        </div>
+      {/* Stat cards */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Clicks" value={totalClicks.toLocaleString()} sub={rangeLabel} />
+        <StatCard label="Profile views" value={localStats.totalViews.toLocaleString()} sub="All time" />
+        <StatCard label="Today" value={todayClicks.toLocaleString()} sub="Clicks" />
+        <StatCard
+          label="Best day"
+          value={localStats.bestDay ? localStats.bestDay.count.toLocaleString() : "—"}
+          sub={bestDayLabel}
+        />
+      </div>
+
+      {/* Clicks chart */}
+      <Section title={`Clicks — ${rangeLabel}`}>
+        <BarChart data={localStats.clicksByDay} today={today} />
+      </Section>
+
+      {/* Views chart */}
+      <Section title={`Profile Views — ${rangeLabel}`}>
+        <BarChart data={localStats.viewsByDay} today={today} dim />
       </Section>
 
       {/* Link performance */}
-      <Section title="Link Performance">
+      <Section title="Link Performance (All Time)">
         {rankedLinks.length === 0 ? (
           <p className="text-xs text-black/30 dark:text-white/30 text-center py-2">No links yet</p>
         ) : (
           <div className="flex flex-col gap-3">
-            {rankedLinks.map((link, i) => (
-              <div key={link.id} className="flex items-center gap-3">
-                <span className="text-[11px] text-black/20 dark:text-white/20 w-4 shrink-0 text-right">{i + 1}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-black/70 dark:text-white/70 truncate">{link.title || "Untitled"}</span>
-                    <span className="text-xs text-black/40 dark:text-white/40 ml-2 shrink-0">{link.count.toLocaleString()}</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-black/25 dark:bg-white/25 transition-all"
-                      style={{ width: `${(link.count / maxLinkClicks) * 100}%` }}
-                    />
+            {rankedLinks.map((link, i) => {
+              const ctr = localStats.totalViews > 0 ? (link.count / localStats.totalViews) * 100 : 0;
+              return (
+                <div key={link.id} className="flex items-center gap-3">
+                  <span className="text-[11px] text-black/20 dark:text-white/20 w-4 shrink-0 text-right">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-black/70 dark:text-white/70 truncate">{link.title || "Untitled"}</span>
+                      <div className="flex items-center gap-2.5 ml-2 shrink-0">
+                        <span className="text-[10px] text-black/25 dark:text-white/25">{ctr.toFixed(1)}% CTR</span>
+                        <span className="text-xs text-black/40 dark:text-white/40">{link.count.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-black/25 dark:bg-white/25 transition-all"
+                        style={{ width: `${(link.count / maxLinkClicks) * 100}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Section>
 
       <p className="text-center text-[11px] text-black/20 dark:text-white/20">
-        Click counts update in real time. Profile views tracked since analytics were enabled.
+        CTR = link clicks ÷ total profile views. Charts update in real time.
       </p>
     </div>
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
+function BarChart({ data, today, dim = false }: { data: Array<{ date: string; count: number }>; today: string; dim?: boolean }) {
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const max = Math.max(...data.map((d) => d.count), 1);
+
   return (
-    <div className="rounded-xl border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex flex-col gap-1">
+    <div className="flex items-end gap-1.5 h-28 pt-2">
+      {data.map((d, i) => {
+        const height = d.count === 0 ? 2 : Math.max(8, Math.round((d.count / max) * 96));
+        const isToday = d.date === today;
+        const isHovered = hoveredIndex === i;
+        const label = d.date.slice(5).replace("-", "/");
+        return (
+          <div
+            key={d.date}
+            className="relative flex-1 flex flex-col items-center gap-1.5"
+            onMouseEnter={() => setHoveredIndex(i)}
+            onMouseLeave={() => setHoveredIndex(null)}
+          >
+            {isHovered && (
+              <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-black dark:bg-white text-white dark:text-black text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap z-10 pointer-events-none shadow-sm">
+                {d.count.toLocaleString()}
+              </div>
+            )}
+            <div
+              className={`w-full rounded-sm transition-all ${
+                isToday
+                  ? dim ? "bg-black/40 dark:bg-white/40" : "bg-black dark:bg-white"
+                  : dim ? "bg-black/8 dark:bg-white/8" : "bg-black/15 dark:bg-white/15"
+              }`}
+              style={{ height: `${height}px` }}
+            />
+            <span className={`text-[9px] ${isToday ? "text-black/50 dark:text-white/50" : "text-black/20 dark:text-white/20"}`}>
+              {label}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex flex-col gap-0.5">
       <span className="text-2xl font-semibold text-black dark:text-white tracking-tight">{value}</span>
       <span className="text-[11px] text-black/35 dark:text-white/35 uppercase tracking-wider">{label}</span>
+      {sub && <span className="text-[10px] text-black/20 dark:text-white/20 mt-0.5">{sub}</span>}
     </div>
   );
 }
