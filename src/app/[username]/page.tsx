@@ -4,7 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { after } from "next/server";
 import Link from "next/link";
 import { db } from "@/db";
-import { profiles, links, socialLinks, profileViews } from "@/db/schema";
+import { profiles, links, socialLinks, profileViews, products } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
@@ -12,6 +12,8 @@ import { SocialLinks } from "@/components/SocialLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { CopyLinkButton } from "@/components/CopyLinkButton";
 import { EmbedCard } from "@/components/EmbedCard";
+import { ProductCard } from "@/components/ProductCard";
+import { EmailCaptureWidget } from "@/components/EmailCaptureWidget";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +33,12 @@ export default async function ProfilePage({
 
   const isOwner = userId === profile.userId;
 
-  const [userLinks, userSocials] = await Promise.all([
+  const [userLinks, userSocials, userProducts] = await Promise.all([
     db.select().from(links).where(eq(links.profileId, profile.id)).orderBy(asc(links.position)),
     db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
+    db.select().from(products).where(eq(products.profileId, profile.id)).orderBy(asc(products.position)),
   ]);
+  const activeProducts = userProducts.filter((p) => p.active);
 
   // Filter links by schedule (headers always shown)
   const now = new Date();
@@ -156,6 +160,38 @@ export default async function ProfilePage({
             )
           )}
         </section>
+
+        {/* Store */}
+        {activeProducts.length > 0 && (
+          <section className="w-full flex flex-col gap-2.5 mt-4">
+            <div className="flex items-center gap-3 py-1">
+              <span className="text-[10px] font-semibold uppercase tracking-widest text-black/30 dark:text-white/30 shrink-0">
+                Store
+              </span>
+              <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
+            </div>
+            {activeProducts.map((p) => (
+              <ProductCard
+                key={p.id}
+                product={{ ...p, coverUrl: p.coverUrl ?? "", fileUrl: p.fileUrl ?? "" }}
+                username={profile.username}
+                accentColor={accentColor}
+              />
+            ))}
+          </section>
+        )}
+
+        {/* Email capture */}
+        {profile.emailCaptureEnabled && (
+          <section className="w-full mt-4">
+            <EmailCaptureWidget
+              username={profile.username}
+              title={profile.emailCaptureTitle || "Stay in the loop"}
+              buttonText={profile.emailCaptureButtonText || "Subscribe"}
+              accentColor={accentColor}
+            />
+          </section>
+        )}
 
         <footer className="mt-auto pt-16 flex flex-col items-center gap-3">
           <SocialLinks links={userSocials} size={cardSize} accentColor={accentColor} />

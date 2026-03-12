@@ -27,6 +27,9 @@ export type Profile = {
   accentColor?: string;
   bgType?: string;
   bgValue?: string;
+  emailCaptureEnabled?: boolean;
+  emailCaptureTitle?: string;
+  emailCaptureButtonText?: string;
   bookingEnabled?: boolean;
   bookingTitle?: string;
   bookingDuration?: number;
@@ -34,6 +37,18 @@ export type Profile = {
   bookingAdvanceDays?: number;
   bookingEmail?: string;
   bookingTimezone?: string;
+};
+
+export type Product = {
+  id: string;
+  title: string;
+  description: string;
+  price: number; // cents
+  currency: string;
+  fileUrl: string;
+  coverUrl: string;
+  active: boolean;
+  position: number;
 };
 
 export type LinksData = {

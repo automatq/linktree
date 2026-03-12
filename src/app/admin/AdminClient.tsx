@@ -28,7 +28,7 @@ export function AdminClient() {
   const [saved, setSaved] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [tab, setTab] = useState<"content" | "analytics" | "booking">("content");
+  const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store">("content");
   const [showQR, setShowQR] = useState(false);
   const { signOut } = useClerk();
 
@@ -194,7 +194,7 @@ export function AdminClient() {
               </>
             )}
             <nav className="flex gap-1">
-              {(["content", "analytics", "booking"] as const).map((t) => (
+              {(["content", "analytics", "booking", "store"] as const).map((t) => (
                 <button
                   key={t}
                   onClick={() => setTab(t)}
@@ -393,6 +393,10 @@ export function AdminClient() {
 
         {tab === "booking" && data.profile && (
           <BookingTab profile={data.profile} username={username ?? ""} />
+        )}
+
+        {tab === "store" && data.profile && (
+          <StoreTab profile={data.profile} username={username ?? ""} />
         )}
 
       </main>
@@ -696,6 +700,306 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
           </div>
         </Section>
       )}
+    </div>
+  );
+}
+
+// ── Store Tab ─────────────────────────────────────────────────────────────────
+
+type ProductRow = {
+  id: string; title: string; description: string; price: number;
+  currency: string; fileUrl: string; coverUrl: string; active: boolean;
+};
+type SubscriberRow = { id: string; email: string; name: string; subscribedAt: string | null };
+
+function StoreTab({ profile, username }: { profile: import("@/data/links").Profile; username: string }) {
+  // Email capture state
+  const [emailEnabled, setEmailEnabled] = useState(profile.emailCaptureEnabled ?? false);
+  const [emailTitle, setEmailTitle] = useState(profile.emailCaptureTitle ?? "Stay in the loop");
+  const [emailButton, setEmailButton] = useState(profile.emailCaptureButtonText ?? "Subscribe");
+  const [subscribers, setSubscribers] = useState<SubscriberRow[]>([]);
+  const [loadingSubs, setLoadingSubs] = useState(true);
+
+  // Products state
+  const [prods, setProds] = useState<ProductRow[]>([]);
+  const [loadingProds, setLoadingProds] = useState(true);
+
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/admin/products").then((r) => r.json()).then((d) => {
+      setProds((d.products || []).map((p: ProductRow & { price: number }) => ({
+        ...p, price: p.price / 100, // cents → dollars for display
+      })));
+      setLoadingProds(false);
+    });
+    fetch("/api/admin/subscribers").then((r) => r.json()).then((d) => {
+      setSubscribers(d.subscribers || []);
+      setLoadingSubs(false);
+    });
+  }, []);
+
+  function genId() { return Math.random().toString(36).slice(2, 9); }
+
+  function addProduct() {
+    setProds((prev) => [...prev, {
+      id: genId(), title: "New Product", description: "", price: 9.99,
+      currency: "usd", fileUrl: "", coverUrl: "", active: true,
+    }]);
+  }
+
+  function updateProd(id: string, field: string, value: string | boolean | number) {
+    setProds((prev) => prev.map((p) => p.id === id ? { ...p, [field]: value } : p));
+  }
+
+  function deleteProd(id: string) {
+    setProds((prev) => prev.filter((p) => p.id !== id));
+  }
+
+  function moveProd(id: string, dir: -1 | 1) {
+    const arr = [...prods];
+    const idx = arr.findIndex((p) => p.id === id);
+    const next = idx + dir;
+    if (next < 0 || next >= arr.length) return;
+    [arr[idx], arr[next]] = [arr[next], arr[idx]];
+    setProds(arr);
+  }
+
+  async function handleSave() {
+    setSaving(true);
+    await Promise.all([
+      fetch("/api/admin/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ products: prods }),
+      }),
+      fetch("/api/data", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          profile: {
+            ...profile,
+            emailCaptureEnabled: emailEnabled,
+            emailCaptureTitle: emailTitle,
+            emailCaptureButtonText: emailButton,
+          },
+          links: [],
+          socialLinks: [],
+        }),
+      }),
+    ]);
+    setSaving(false);
+    setSavedMsg(true);
+    setTimeout(() => setSavedMsg(false), 2000);
+  }
+
+  function exportCSV() {
+    const header = "email,name,subscribed_at\n";
+    const rows = subscribers.map((s) =>
+      `"${s.email}","${s.name}","${s.subscribedAt ?? ""}"`
+    ).join("\n");
+    const blob = new Blob([header + rows], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "subscribers.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function deleteSubscriber(id: string) {
+    await fetch("/api/admin/subscribers", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    setSubscribers((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  const inputClass = "h-8 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors";
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Products section */}
+      <Section
+        title="Products"
+        action={
+          <div className="flex items-center gap-3">
+            <span className={`text-xs transition-all duration-300 ${savedMsg ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+            <button
+              onClick={addProduct}
+              className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+            >
+              <span className="text-base leading-none">+</span> Add product
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+          </div>
+        }
+      >
+        {loadingProds ? (
+          <div className="flex justify-center py-4">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+          </div>
+        ) : prods.length === 0 ? (
+          <p className="text-xs text-black/30 dark:text-white/30 text-center py-2">
+            No products yet. Add one above to start selling digital downloads.
+          </p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {prods.map((p, i) => (
+              <div key={p.id} className="rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-black p-3 flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col gap-0.5">
+                    <button onClick={() => moveProd(p.id, -1)} disabled={i === 0} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 2L9 7H1L5 2Z" fill="currentColor" /></svg>
+                    </button>
+                    <button onClick={() => moveProd(p.id, 1)} disabled={i === prods.length - 1} className="flex h-5 w-5 items-center justify-center rounded text-black/20 hover:text-black/60 dark:text-white/20 dark:hover:text-white/60 disabled:opacity-20">
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 8L1 3H9L5 8Z" fill="currentColor" /></svg>
+                    </button>
+                  </div>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <input
+                      className={inputClass + " w-full"}
+                      value={p.title}
+                      onChange={(e) => updateProd(p.id, "title", e.target.value)}
+                      placeholder="Product name"
+                    />
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-black/30 dark:text-white/30">$</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        className={inputClass + " w-full"}
+                        value={p.price}
+                        onChange={(e) => updateProd(p.id, "price", parseFloat(e.target.value) || 0)}
+                        placeholder="9.99"
+                      />
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => updateProd(p.id, "active", !p.active)}
+                    className={`shrink-0 text-[10px] px-2 py-1 rounded-md transition-colors ${p.active ? "bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-400" : "bg-black/5 dark:bg-white/5 text-black/30 dark:text-white/30"}`}
+                  >
+                    {p.active ? "Active" : "Hidden"}
+                  </button>
+                  <button onClick={() => deleteProd(p.id)} className="shrink-0 text-black/20 hover:text-red-400 dark:text-white/20 dark:hover:text-red-400 transition-colors">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+                <input
+                  className={inputClass + " w-full"}
+                  value={p.description}
+                  onChange={(e) => updateProd(p.id, "description", e.target.value)}
+                  placeholder="Description (optional)"
+                />
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">File URL</label>
+                    <input
+                      className={inputClass + " w-full"}
+                      value={p.fileUrl}
+                      onChange={(e) => updateProd(p.id, "fileUrl", e.target.value)}
+                      placeholder="https://... (paste Blob URL)"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Cover image URL</label>
+                    <input
+                      className={inputClass + " w-full"}
+                      value={p.coverUrl}
+                      onChange={(e) => updateProd(p.id, "coverUrl", e.target.value)}
+                      placeholder="https://... (optional)"
+                    />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* Email capture section */}
+      <Section title="Email List">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-black dark:text-white">Email capture widget</p>
+              <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
+                {emailEnabled && username ? (
+                  <>Shows on <a href={`/${username}`} target="_blank" className="underline underline-offset-2">your profile</a></>
+                ) : "Show a subscribe box on your profile"}
+              </p>
+            </div>
+            <button
+              onClick={() => setEmailEnabled((v) => !v)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${emailEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${emailEnabled ? "translate-x-5" : "translate-x-0"}`} />
+            </button>
+          </div>
+          {emailEnabled && (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Heading</label>
+                <input className={inputClass + " w-full"} value={emailTitle} onChange={(e) => setEmailTitle(e.target.value)} placeholder="Stay in the loop" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Button text</label>
+                <input className={inputClass + " w-full"} value={emailButton} onChange={(e) => setEmailButton(e.target.value)} placeholder="Subscribe" />
+              </div>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      {/* Subscribers list */}
+      <Section
+        title={`Subscribers (${subscribers.length})`}
+        action={
+          subscribers.length > 0 ? (
+            <button
+              onClick={exportCSV}
+              className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+            >
+              Export CSV
+            </button>
+          ) : undefined
+        }
+      >
+        {loadingSubs ? (
+          <div className="flex justify-center py-4">
+            <svg className="animate-spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+          </div>
+        ) : subscribers.length === 0 ? (
+          <p className="text-xs text-black/30 dark:text-white/30 text-center py-2">No subscribers yet.</p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {subscribers.map((s) => (
+              <div key={s.id} className="flex items-center justify-between gap-3 py-1.5 border-b border-black/5 dark:border-white/5 last:border-0">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs text-black dark:text-white truncate">{s.email}</p>
+                  {s.name && <p className="text-[10px] text-black/40 dark:text-white/40">{s.name}</p>}
+                </div>
+                <span className="text-[10px] text-black/25 dark:text-white/25 shrink-0">
+                  {s.subscribedAt ? new Date(s.subscribedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : ""}
+                </span>
+                <button
+                  onClick={() => deleteSubscriber(s.id)}
+                  className="shrink-0 text-black/15 hover:text-red-400 dark:text-white/15 dark:hover:text-red-400 transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
     </div>
   );
 }
