@@ -261,6 +261,56 @@ export function AdminClient() {
 
         {tab === "content" && (
           <>
+            {/* Templates section */}
+            <Section title="Templates">
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-black/40 dark:text-white/40">Apply a preset style to your profile in one click.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {([
+                    { name: "Minimal",  font: "mono",  cardStyle: "minimal",  cardSize: "md",  accentColor: "",        bgType: "none",     bgValue: "",                                          preview: "bg-white dark:bg-black border border-black/10 dark:border-white/10" },
+                    { name: "Creator",  font: "sans",  cardStyle: "rounded",  cardSize: "lg",  accentColor: "#f97316", bgType: "none",     bgValue: "",                                          preview: "bg-orange-50 dark:bg-orange-950/30 border border-orange-200 dark:border-orange-900" },
+                    { name: "Business", font: "inter", cardStyle: "bordered", cardSize: "md",  accentColor: "#3b82f6", bgType: "none",     bgValue: "",                                          preview: "bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900" },
+                    { name: "Neon",     font: "mono",  cardStyle: "minimal",  cardSize: "md",  accentColor: "#22c55e", bgType: "color",    bgValue: "#0a0a0a",                                   preview: "bg-black border border-green-500/40" },
+                    { name: "Sunset",   font: "sans",  cardStyle: "rounded",  cardSize: "lg",  accentColor: "#ec4899", bgType: "gradient", bgValue: "linear-gradient(135deg,#fdf2f8,#fce7f3)",   preview: "bg-gradient-to-br from-pink-50 to-rose-100 dark:from-pink-950/40 dark:to-rose-950/40 border border-pink-200 dark:border-pink-900" },
+                    { name: "Ocean",    font: "inter", cardStyle: "shadow",   cardSize: "md",  accentColor: "#06b6d4", bgType: "gradient", bgValue: "linear-gradient(135deg,#ecfeff,#cffafe)",   preview: "bg-gradient-to-br from-cyan-50 to-teal-100 dark:from-cyan-950/40 dark:to-teal-950/40 border border-cyan-200 dark:border-cyan-900" },
+                  ] as const).map((tpl) => (
+                    <button
+                      key={tpl.name}
+                      onClick={() => {
+                        const next = {
+                          ...data!,
+                          profile: {
+                            ...data!.profile,
+                            font: tpl.font,
+                            cardStyle: tpl.cardStyle,
+                            cardSize: tpl.cardSize,
+                            accentColor: tpl.accentColor,
+                            bgType: tpl.bgType,
+                            bgValue: tpl.bgValue,
+                          },
+                        };
+                        setData(next);
+                        save(next);
+                      }}
+                      className={`relative flex flex-col items-center justify-center gap-1.5 rounded-xl p-3 h-20 text-xs font-medium transition-all hover:scale-[1.03] active:scale-[0.98] ${tpl.preview}`}
+                    >
+                      <div className="flex gap-0.5">
+                        {[14, 20, 12].map((w, i) => (
+                          <div key={i} className="h-1.5 rounded-full bg-current opacity-20" style={{ width: w }} />
+                        ))}
+                      </div>
+                      <div className="flex gap-0.5">
+                        {[18, 10, 16].map((w, i) => (
+                          <div key={i} className="h-1.5 rounded-full bg-current opacity-10" style={{ width: w }} />
+                        ))}
+                      </div>
+                      <span className="mt-1 text-[10px] font-semibold tracking-wide opacity-60">{tpl.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </Section>
+
             {/* Profile section */}
             <Section title="Profile" action={
               <div className="flex items-center gap-2">

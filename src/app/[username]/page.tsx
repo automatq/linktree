@@ -212,9 +212,17 @@ export default async function ProfilePage({
           {(profile.socialLinksPosition ?? "footer") === "footer" && (
             <SocialLinks links={userSocials} size={cardSize} accentColor={accentColor} />
           )}
-          <p className="text-xs text-black/15 dark:text-white/15 select-none">
-            Built with <span className="text-black/25 dark:text-white/25">Next.js</span>
-          </p>
+          <a
+            href={`${process.env.NEXT_PUBLIC_APP_URL || "https://trilink.app"}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-black/20 dark:text-white/20 hover:text-black/40 dark:hover:text-white/40 transition-colors select-none"
+          >
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M13 3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            Powered by Trilink
+          </a>
         </footer>
       </main>
     </div>
