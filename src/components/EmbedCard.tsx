@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Link } from "@/data/links";
 
 export type EmbedPlatform = "youtube" | "spotify" | "tweet" | null;
@@ -11,9 +11,57 @@ export function getEmbedPlatform(url: string): EmbedPlatform {
   return null;
 }
 
-function getYouTubeEmbedUrl(url: string): string | null {
+function getYouTubeVideoId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/live\/)([a-zA-Z0-9_-]{11})/);
-  return m ? `https://www.youtube.com/embed/${m[1]}?rel=0` : null;
+  return m ? m[1] : null;
+}
+
+function getYouTubeEmbedUrl(url: string): string | null {
+  const id = getYouTubeVideoId(url);
+  return id ? `https://www.youtube.com/embed/${id}?rel=0` : null;
+}
+
+function isYouTubeLiveUrl(url: string): boolean {
+  return /youtube\.com\/live\//.test(url);
+}
+
+function YouTubeEmbed({ url, title }: { url: string; title?: string }) {
+  const src = getYouTubeEmbedUrl(url);
+  const [isLive, setIsLive] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!isYouTubeLiveUrl(url)) return;
+    const id = getYouTubeVideoId(url);
+    if (!id) return;
+    fetch(`/api/youtube-live?videoId=${id}`)
+      .then((r) => r.json())
+      .then((d) => setIsLive(d.isLive))
+      .catch(() => setIsLive(false));
+  }, [url]);
+
+  if (!src) return null;
+
+  return (
+    <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+      <iframe
+        src={src}
+        className="absolute inset-0 w-full h-full"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allowFullScreen
+        loading="lazy"
+        title={title || "YouTube video"}
+      />
+      {isLive && (
+        <div className="absolute top-2 left-2 flex items-center gap-1.5 rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold text-white shadow">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
+          </span>
+          LIVE
+        </div>
+      )}
+    </div>
+  );
 }
 
 function getSpotifyEmbedUrl(url: string): { src: string; compact: boolean } | null {
@@ -61,7 +109,6 @@ export function EmbedCard({ link }: { link: Link }) {
   const platform = getEmbedPlatform(link.url);
   if (!platform) return null;
 
-  const ytSrc = platform === "youtube" ? getYouTubeEmbedUrl(link.url) : null;
   const spotifyInfo = platform === "spotify" ? getSpotifyEmbedUrl(link.url) : null;
 
   return (
@@ -72,17 +119,8 @@ export function EmbedCard({ link }: { link: Link }) {
         </div>
       )}
 
-      {platform === "youtube" && ytSrc && (
-        <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
-          <iframe
-            src={ytSrc}
-            className="absolute inset-0 w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-            loading="lazy"
-            title={link.title || "YouTube video"}
-          />
-        </div>
+      {platform === "youtube" && (
+        <YouTubeEmbed url={link.url} title={link.title} />
       )}
 
       {platform === "spotify" && spotifyInfo && (
