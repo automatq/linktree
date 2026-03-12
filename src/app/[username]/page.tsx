@@ -221,7 +221,7 @@ export default async function ProfilePage({
             <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
               <path d="M13 3L4 14h7v7l9-11h-7z"/>
             </svg>
-            Powered by Trilink
+            Powered by TriLink
           </a>
         </footer>
       </main>
