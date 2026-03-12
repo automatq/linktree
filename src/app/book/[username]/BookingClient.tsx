@@ -13,9 +13,10 @@ type BookingClientProps = {
   title: string;
   duration: number;
   accentColor?: string;
+  isEmbed?: boolean;
 };
 
-export function BookingClient({ username, hostName, title, duration, accentColor }: BookingClientProps) {
+export function BookingClient({ username, hostName, title, duration, accentColor, isEmbed }: BookingClientProps) {
   const [step, setStep] = useState<Step>("calendar");
   const [availableDates, setAvailableDates] = useState<string[]>([]);
   const [hostTimezone, setHostTimezone] = useState("UTC");
@@ -398,12 +399,14 @@ export function BookingClient({ username, hostName, title, duration, accentColor
               </p>
             </div>
 
-            <a
-              href={`/${username}`}
-              className="text-sm text-black/30 dark:text-white/30 hover:text-black dark:hover:text-white transition-colors"
-            >
-              ← Back to profile
-            </a>
+            {!isEmbed && (
+              <a
+                href={`/${username}`}
+                className="text-sm text-black/30 dark:text-white/30 hover:text-black dark:hover:text-white transition-colors"
+              >
+                ← Back to profile
+              </a>
+            )}
           </div>
         )}
       </div>
