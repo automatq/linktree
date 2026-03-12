@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean, index } from "drizzle-orm/pg-core";
 
 
 export const profiles = pgTable("profiles", {
@@ -35,7 +35,9 @@ export const profiles = pgTable("profiles", {
   socialLinksPosition: text("social_links_position").notNull().default("footer"), // "footer" | "bio"
   customDomain: text("custom_domain").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("profiles_custom_domain_idx").on(t.customDomain),
+]);
 
 export const links = pgTable("links", {
   id: text("id").primaryKey(),
