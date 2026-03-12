@@ -20,6 +20,9 @@ type Stats = {
   totalViews: number;
   bestDay: { date: string; count: number } | null;
   linkTitles: Record<string, string>;
+  referrers: Array<{ label: string; count: number }>;
+  devices: Array<{ device: string; count: number }>;
+  countries: Array<{ country: string; count: number }>;
 };
 
 export function AdminClient() {
@@ -1421,8 +1424,13 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
 
 // ── Analytics Tab ────────────────────────────────────────────────────────────
 
+function countryFlag(code: string): string {
+  if (!code || code.length !== 2) return "🌍";
+  return String.fromCodePoint(...code.toUpperCase().split("").map((c) => 0x1f1e6 - 65 + c.charCodeAt(0)));
+}
+
 function AnalyticsTab({ links }: { links: Link[] }) {
-  const [days, setDays] = useState<7 | 14>(14);
+  const [days, setDays] = useState<7 | 14 | 30>(14);
   const [localStats, setLocalStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -1436,15 +1444,16 @@ function AnalyticsTab({ links }: { links: Link[] }) {
   if (loading || !localStats) {
     return (
       <div className="flex items-center justify-center py-20">
-        <span className="text-xs text-black/30 dark:text-white/30">Loading analytics…</span>
+        <span className="text-xs text-black/30 dark:text-white/30">Loading analytics...</span>
       </div>
     );
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const todayClicks = localStats.clicksByDay.find((d) => d.date === today)?.count ?? 0;
+  const todayViews = localStats.viewsByDay.find((d) => d.date === today)?.count ?? 0;
   const totalClicks = localStats.clicksByDay.reduce((a, b) => a + b.count, 0);
-  const rangeLabel = `Last ${days} Days`;
+  const totalRangeViews = localStats.viewsByDay.reduce((a, b) => a + b.count, 0);
+  const rangeLabel = `Last ${days} days`;
 
   const bestDayLabel = localStats.bestDay
     ? new Date(localStats.bestDay.date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" })
@@ -1457,11 +1466,19 @@ function AnalyticsTab({ links }: { links: Link[] }) {
 
   const maxLinkClicks = Math.max(...rankedLinks.map((l) => l.count), 1);
 
+  // Device totals
+  const totalDevices = localStats.devices.reduce((a, b) => a + b.count, 0) || 1;
+  const deviceMap: Record<string, number> = {};
+  for (const d of localStats.devices) deviceMap[d.device] = d.count;
+
+  const maxReferrer = Math.max(...(localStats.referrers.map((r) => r.count)), 1);
+  const maxCountry = Math.max(...(localStats.countries.map((c) => c.count)), 1);
+
   return (
     <div className="flex flex-col gap-8">
       {/* Range toggle */}
       <div className="flex items-center justify-end gap-1">
-        {([7, 14] as const).map((d) => (
+        {([7, 14, 30] as const).map((d) => (
           <button
             key={d}
             onClick={() => setDays(d)}
@@ -1478,9 +1495,9 @@ function AnalyticsTab({ links }: { links: Link[] }) {
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Clicks" value={totalClicks.toLocaleString()} sub={rangeLabel} />
-        <StatCard label="Profile views" value={localStats.totalViews.toLocaleString()} sub="All time" />
-        <StatCard label="Today" value={todayClicks.toLocaleString()} sub="Clicks" />
+        <StatCard label="Profile views" value={totalRangeViews.toLocaleString()} sub={rangeLabel} />
+        <StatCard label="Link clicks" value={totalClicks.toLocaleString()} sub={rangeLabel} />
+        <StatCard label="Today" value={todayViews.toLocaleString()} sub="Views" />
         <StatCard
           label="Best day"
           value={localStats.bestDay ? localStats.bestDay.count.toLocaleString() : "—"}
@@ -1488,15 +1505,94 @@ function AnalyticsTab({ links }: { links: Link[] }) {
         />
       </div>
 
-      {/* Clicks chart */}
-      <Section title={`Clicks — ${rangeLabel}`}>
-        <BarChart data={localStats.clicksByDay} today={today} />
-      </Section>
-
       {/* Views chart */}
       <Section title={`Profile Views — ${rangeLabel}`}>
-        <BarChart data={localStats.viewsByDay} today={today} dim />
+        <BarChart data={localStats.viewsByDay} today={today} />
       </Section>
+
+      {/* Clicks chart */}
+      <Section title={`Link Clicks — ${rangeLabel}`}>
+        <BarChart data={localStats.clicksByDay} today={today} dim />
+      </Section>
+
+      {/* Referrers + Devices side by side */}
+      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+        {/* Top referrers */}
+        <Section title="Top Sources">
+          {localStats.referrers.length === 0 ? (
+            <p className="text-xs text-black/30 dark:text-white/30 py-2">No data yet</p>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {localStats.referrers.map((r) => (
+                <div key={r.label} className="flex items-center gap-2">
+                  <span className="text-xs text-black/60 dark:text-white/60 w-24 shrink-0 truncate">{r.label}</span>
+                  <div className="flex-1 h-1.5 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                    <div className="h-full rounded-full bg-black/30 dark:bg-white/30 transition-all" style={{ width: `${(r.count / maxReferrer) * 100}%` }} />
+                  </div>
+                  <span className="text-xs text-black/40 dark:text-white/40 w-8 text-right shrink-0">{r.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
+        {/* Device breakdown */}
+        <Section title="Devices">
+          {localStats.devices.length === 0 ? (
+            <p className="text-xs text-black/30 dark:text-white/30 py-2">No data yet</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {(["mobile", "desktop", "tablet"] as const).map((type) => {
+                const count = deviceMap[type] ?? 0;
+                const pct = Math.round((count / totalDevices) * 100);
+                const icons = {
+                  mobile: <path d="M12 18h.01M8 21h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z" />,
+                  desktop: <><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4" /></>,
+                  tablet: <><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18" /></>,
+                };
+                return (
+                  <div key={type} className="flex items-center gap-3">
+                    <svg className="shrink-0 text-black/30 dark:text-white/30" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                      {icons[type]}
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex justify-between mb-1">
+                        <span className="text-xs capitalize text-black/60 dark:text-white/60">{type}</span>
+                        <span className="text-xs text-black/40 dark:text-white/40">{pct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                        <div className="h-full rounded-full bg-black/25 dark:bg-white/25 transition-all" style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+      </div>
+
+      {/* Countries */}
+      {localStats.countries.length > 0 && (
+        <Section title="Top Countries">
+          <div className="grid grid-cols-2 gap-2">
+            {localStats.countries.map((c) => (
+              <div key={c.country} className="flex items-center gap-2">
+                <span className="text-base leading-none">{countryFlag(c.country)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between mb-0.5">
+                    <span className="text-xs text-black/60 dark:text-white/60 truncate">{c.country}</span>
+                    <span className="text-xs text-black/40 dark:text-white/40 ml-1 shrink-0">{c.count}</span>
+                  </div>
+                  <div className="h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
+                    <div className="h-full rounded-full bg-black/20 dark:bg-white/20" style={{ width: `${(c.count / maxCountry) * 100}%` }} />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* Link performance */}
       <Section title="Link Performance (All Time)">
@@ -1518,10 +1614,7 @@ function AnalyticsTab({ links }: { links: Link[] }) {
                       </div>
                     </div>
                     <div className="h-1 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-black/25 dark:bg-white/25 transition-all"
-                        style={{ width: `${(link.count / maxLinkClicks) * 100}%` }}
-                      />
+                      <div className="h-full rounded-full bg-black/25 dark:bg-white/25 transition-all" style={{ width: `${(link.count / maxLinkClicks) * 100}%` }} />
                     </div>
                   </div>
                 </div>
@@ -1532,7 +1625,7 @@ function AnalyticsTab({ links }: { links: Link[] }) {
       </Section>
 
       <p className="text-center text-[11px] text-black/20 dark:text-white/20">
-        CTR = link clicks ÷ total profile views. Charts update in real time.
+        CTR = link clicks / total profile views. Data updates in real time.
       </p>
     </div>
   );

@@ -66,12 +66,18 @@ export const linkClicks = pgTable("link_clicks", {
   linkId: text("link_id").notNull(),
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   clickedAt: timestamp("clicked_at").defaultNow(),
+  referrer: text("referrer").notNull().default(""),
+  device: text("device").notNull().default(""),
+  country: text("country").notNull().default(""),
 });
 
 export const profileViews = pgTable("profile_views", {
   id: serial("id").primaryKey(),
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   viewedAt: timestamp("viewed_at").defaultNow(),
+  referrer: text("referrer").notNull().default(""),
+  device: text("device").notNull().default(""),
+  country: text("country").notNull().default(""),
 });
 
 // Weekly recurring availability windows

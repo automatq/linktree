@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { links, linkClicks } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { parseDevice, parseReferrer } from "@/lib/tracking";
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ linkId: string }> }
 ) {
   const { linkId } = await params;
@@ -17,10 +18,17 @@ export async function GET(
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
-  // Record click (fire-and-forget style — don't block the redirect)
+  const device = parseDevice(req.headers.get("user-agent") ?? "");
+  const referrer = parseReferrer(req.headers.get("referer") ?? "");
+  const country = req.headers.get("x-vercel-ip-country") ?? "";
+
+  // Record click (fire-and-forget — don't block the redirect)
   db.insert(linkClicks).values({
     linkId: link.id,
     profileId: link.profileId,
+    device,
+    referrer,
+    country,
   }).catch(() => {});
 
   const url = /^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`;

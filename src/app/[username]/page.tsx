@@ -2,6 +2,7 @@ import React from "react";
 import { notFound } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { after } from "next/server";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db";
 import { profiles, links, socialLinks, profileViews, products } from "@/db/schema";
@@ -15,6 +16,7 @@ import { EmbedCard } from "@/components/EmbedCard";
 import { ProductCard } from "@/components/ProductCard";
 import { EmailCaptureWidget } from "@/components/EmailCaptureWidget";
 import { BookingClient } from "@/app/book/[username]/BookingClient";
+import { parseDevice, parseReferrer } from "@/lib/tracking";
 
 export const dynamic = "force-dynamic";
 
@@ -50,9 +52,20 @@ export default async function ProfilePage({
     return true;
   });
 
+  // Capture tracking data before response is sent
+  const reqHeaders = await headers();
+  const trackingDevice = parseDevice(reqHeaders.get("user-agent") ?? "");
+  const trackingReferrer = parseReferrer(reqHeaders.get("referer") ?? "");
+  const trackingCountry = reqHeaders.get("x-vercel-ip-country") ?? "";
+
   // Track view after response is sent — no latency impact
   after(async () => {
-    await db.insert(profileViews).values({ profileId: profile.id }).catch(() => {});
+    await db.insert(profileViews).values({
+      profileId: profile.id,
+      referrer: trackingReferrer,
+      device: trackingDevice,
+      country: trackingCountry,
+    }).catch(() => {});
   });
 
   const cardStyle = (profile.cardStyle ?? "minimal") as CardStyle;
