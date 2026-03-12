@@ -110,16 +110,20 @@ export default async function ProfilePage({
   const fontFamily = fontMap[profile.font ?? "mono"] ?? fontMap.mono;
 
   return (
-    <div className={`min-h-screen transition-colors duration-200 ${hasBg ? "" : "bg-white dark:bg-black"}`} style={{ fontFamily }}>
+    <div className="min-h-screen transition-colors duration-200" style={{ fontFamily }}>
       <PixelScripts
         metaPixelId={profile.metaPixelId || undefined}
         tiktokPixelId={profile.tiktokPixelId || undefined}
         googleTagId={profile.googleTagId || undefined}
       />
-      {/* Background layer — always behind everything */}
+      {/* Base background color — deepest layer */}
+      {!hasBg && (
+        <div className="fixed inset-0 -z-20 pointer-events-none bg-white dark:bg-black" />
+      )}
+      {/* Custom background — behind grid */}
       {hasBg && (
         <div
-          className="fixed inset-0 -z-10 pointer-events-none"
+          className="fixed inset-0 -z-20 pointer-events-none"
           style={
             bgType === "image"
               ? { backgroundImage: `url(${bgValue})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -127,19 +131,20 @@ export default async function ProfilePage({
           }
         />
       )}
+      {/* Grid overlay — light mode */}
       <div
         className="fixed inset-0 -z-10 pointer-events-none"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
+            "linear-gradient(rgba(0,0,0,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.04) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />
       <div
-        className="fixed inset-0 -z-10 pointer-events-none dark:block hidden"
+        className="fixed inset-0 -z-10 pointer-events-none hidden dark:block"
         style={{
           backgroundImage:
-            "linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)",
+            "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />
