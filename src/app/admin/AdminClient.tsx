@@ -484,24 +484,31 @@ function AnalyticsTab({ links }: { links: Link[] }) {
 function BarChart({ data, today, dim = false }: { data: Array<{ date: string; count: number }>; today: string; dim?: boolean }) {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const max = Math.max(...data.map((d) => d.count), 1);
+  const n = data.length;
+
+  // Label cadence: show all for 7d, every other for 14d, every 5th for 30d
+  const labelEvery = n <= 7 ? 1 : n <= 14 ? 2 : 5;
+  const gap = n >= 20 ? "gap-0.5" : "gap-1.5";
 
   return (
-    <div className="flex items-end gap-1.5 h-28 pt-2">
+    <div className={`flex items-end ${gap} h-28 pt-2`}>
       {data.map((d, i) => {
         const height = d.count === 0 ? 2 : Math.max(8, Math.round((d.count / max) * 96));
         const isToday = d.date === today;
         const isHovered = hoveredIndex === i;
+        // Show label at regular cadence, always show today and first/last
+        const showLabel = i === 0 || i === n - 1 || isToday || i % labelEvery === 0;
         const label = d.date.slice(5).replace("-", "/");
         return (
           <div
             key={d.date}
-            className="relative flex-1 flex flex-col items-center gap-1.5"
+            className="relative flex-1 flex flex-col items-center gap-1"
             onMouseEnter={() => setHoveredIndex(i)}
             onMouseLeave={() => setHoveredIndex(null)}
           >
             {isHovered && (
               <div className="absolute bottom-full mb-1.5 left-1/2 -translate-x-1/2 bg-black dark:bg-white text-white dark:text-black text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap z-10 pointer-events-none shadow-sm">
-                {d.count.toLocaleString()}
+                {label} · {d.count.toLocaleString()}
               </div>
             )}
             <div
@@ -512,7 +519,7 @@ function BarChart({ data, today, dim = false }: { data: Array<{ date: string; co
               }`}
               style={{ height: `${height}px` }}
             />
-            <span className={`text-[9px] ${isToday ? "text-black/50 dark:text-white/50" : "text-black/20 dark:text-white/20"}`}>
+            <span className={`text-[8px] leading-none ${showLabel ? (isToday ? "text-black/50 dark:text-white/50" : "text-black/20 dark:text-white/20") : "text-transparent"}`}>
               {label}
             </span>
           </div>
