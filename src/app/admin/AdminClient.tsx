@@ -383,6 +383,125 @@ export function AdminClient() {
               />
             </Section>
 
+            {/* Links section */}
+            <Section
+              title="Links"
+              action={
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={addSection}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add section
+                  </button>
+                  <button
+                    onClick={addEmbed}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add embed
+                  </button>
+                  <button
+                    onClick={addBookingWidget}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add booking
+                  </button>
+                  <button
+                    onClick={addLink}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add link
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-col gap-2">
+                {data.links.map((link, i) =>
+                  link.type === "header" ? (
+                    <SectionRow
+                      key={link.id}
+                      link={link}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : link.type === "embed" ? (
+                    <EmbedRow
+                      key={link.id}
+                      link={link}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : link.type === "booking" ? (
+                    <BookingWidgetRow
+                      key={link.id}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  ) : (
+                    <LinkRow
+                      key={link.id}
+                      link={link}
+                      clickCount={stats?.byLink[link.id] ?? 0}
+                      isFirst={i === 0}
+                      isLast={i === data.links.length - 1}
+                      onChange={(f, v) => updateLink(link.id, f, v)}
+                      onDelete={() => deleteLink(link.id)}
+                      onMove={(dir) => moveLink(link.id, dir)}
+                    />
+                  )
+                )}
+              </div>
+            </Section>
+
+            {/* Social links section */}
+            <Section
+              title="Social Links"
+              action={
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 rounded-lg border border-black/10 dark:border-white/10 p-0.5 text-[11px]">
+                    {(["footer", "bio"] as const).map((pos) => (
+                      <button
+                        key={pos}
+                        onClick={() => updateProfile("socialLinksPosition", pos)}
+                        className={`px-2.5 py-0.5 rounded-md capitalize transition-colors ${
+                          (data.profile.socialLinksPosition ?? "footer") === pos
+                            ? "bg-black dark:bg-white text-white dark:text-black font-medium"
+                            : "text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"
+                        }`}
+                      >
+                        {pos === "footer" ? "Footer" : "Under bio"}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={addSocial}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-col gap-2">
+                {data.socialLinks.map((social) => (
+                  <SocialRow
+                    key={social.platform}
+                    social={social}
+                    onChange={(f, v) => updateSocial(social.platform, f, v)}
+                    onDelete={() => deleteSocial(social.platform)}
+                  />
+                ))}
+              </div>
+            </Section>
+
             {/* Custom domain section */}
             <Section
               title="Custom Domain"
@@ -544,125 +663,6 @@ export function AdminClient() {
                     Visit {customDomain}
                   </a>
                 )}
-              </div>
-            </Section>
-
-            {/* Links section */}
-            <Section
-              title="Links"
-              action={
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={addSection}
-                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                  >
-                    <span className="text-base leading-none">+</span> Add section
-                  </button>
-                  <button
-                    onClick={addEmbed}
-                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                  >
-                    <span className="text-base leading-none">+</span> Add embed
-                  </button>
-                  <button
-                    onClick={addBookingWidget}
-                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                  >
-                    <span className="text-base leading-none">+</span> Add booking
-                  </button>
-                  <button
-                    onClick={addLink}
-                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                  >
-                    <span className="text-base leading-none">+</span> Add link
-                  </button>
-                </div>
-              }
-            >
-              <div className="flex flex-col gap-2">
-                {data.links.map((link, i) =>
-                  link.type === "header" ? (
-                    <SectionRow
-                      key={link.id}
-                      link={link}
-                      isFirst={i === 0}
-                      isLast={i === data.links.length - 1}
-                      onChange={(f, v) => updateLink(link.id, f, v)}
-                      onDelete={() => deleteLink(link.id)}
-                      onMove={(dir) => moveLink(link.id, dir)}
-                    />
-                  ) : link.type === "embed" ? (
-                    <EmbedRow
-                      key={link.id}
-                      link={link}
-                      isFirst={i === 0}
-                      isLast={i === data.links.length - 1}
-                      onChange={(f, v) => updateLink(link.id, f, v)}
-                      onDelete={() => deleteLink(link.id)}
-                      onMove={(dir) => moveLink(link.id, dir)}
-                    />
-                  ) : link.type === "booking" ? (
-                    <BookingWidgetRow
-                      key={link.id}
-                      isFirst={i === 0}
-                      isLast={i === data.links.length - 1}
-                      onDelete={() => deleteLink(link.id)}
-                      onMove={(dir) => moveLink(link.id, dir)}
-                    />
-                  ) : (
-                    <LinkRow
-                      key={link.id}
-                      link={link}
-                      clickCount={stats?.byLink[link.id] ?? 0}
-                      isFirst={i === 0}
-                      isLast={i === data.links.length - 1}
-                      onChange={(f, v) => updateLink(link.id, f, v)}
-                      onDelete={() => deleteLink(link.id)}
-                      onMove={(dir) => moveLink(link.id, dir)}
-                    />
-                  )
-                )}
-              </div>
-            </Section>
-
-            {/* Social links section */}
-            <Section
-              title="Social Links"
-              action={
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1 rounded-lg border border-black/10 dark:border-white/10 p-0.5 text-[11px]">
-                    {(["footer", "bio"] as const).map((pos) => (
-                      <button
-                        key={pos}
-                        onClick={() => updateProfile("socialLinksPosition", pos)}
-                        className={`px-2.5 py-0.5 rounded-md capitalize transition-colors ${
-                          (data.profile.socialLinksPosition ?? "footer") === pos
-                            ? "bg-black dark:bg-white text-white dark:text-black font-medium"
-                            : "text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"
-                        }`}
-                      >
-                        {pos === "footer" ? "Footer" : "Under bio"}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    onClick={addSocial}
-                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                  >
-                    <span className="text-base leading-none">+</span> Add
-                  </button>
-                </div>
-              }
-            >
-              <div className="flex flex-col gap-2">
-                {data.socialLinks.map((social) => (
-                  <SocialRow
-                    key={social.platform}
-                    social={social}
-                    onChange={(f, v) => updateSocial(social.platform, f, v)}
-                    onDelete={() => deleteSocial(social.platform)}
-                  />
-                ))}
               </div>
             </Section>
           </>
