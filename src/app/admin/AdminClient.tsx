@@ -84,7 +84,7 @@ export function AdminClient() {
       ...data!,
       links: [
         ...data!.links,
-        { id: genId(), title: "New Link", description: "", url: "#", icon: "globe", type: "link" as const },
+        { id: genId(), title: "New Link", description: "", url: "", icon: "globe", type: "link" as const },
       ],
     };
     setData(next);
@@ -141,7 +141,7 @@ export function AdminClient() {
       ...data!,
       socialLinks: [
         ...data!.socialLinks,
-        { platform: genId(), url: "#", icon: "globe" },
+        { platform: genId(), url: "", icon: "globe" },
       ],
     };
     setData(next);

@@ -114,7 +114,7 @@ export async function POST(req: Request) {
         profileId: profile!.id,
         title: l.title,
         description: l.description || "",
-        url: l.type === "header" ? "" : (l.url || "#"),
+        url: l.type === "header" ? "" : (l.url || ""),
         icon: (l.type === "header" || l.type === "embed") ? "" : (l.icon || "globe"),
         position: i,
         type: l.type || "link",
