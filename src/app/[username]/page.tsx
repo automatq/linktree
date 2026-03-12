@@ -139,6 +139,9 @@ export default async function ProfilePage({
               {profile.bio}
             </p>
           )}
+          {profile.socialLinksPosition === "bio" && userSocials.length > 0 && (
+            <SocialLinks links={userSocials} size={cardSize} accentColor={accentColor} />
+          )}
         </section>
 
         <div className="mb-6 h-px w-full bg-black/5 dark:bg-white/5" />
@@ -206,7 +209,9 @@ export default async function ProfilePage({
         )}
 
         <footer className="mt-auto pt-16 flex flex-col items-center gap-3">
-          <SocialLinks links={userSocials} size={cardSize} accentColor={accentColor} />
+          {(profile.socialLinksPosition ?? "footer") === "footer" && (
+            <SocialLinks links={userSocials} size={cardSize} accentColor={accentColor} />
+          )}
           <p className="text-xs text-black/15 dark:text-white/15 select-none">
             Built with <span className="text-black/25 dark:text-white/25">Next.js</span>
           </p>

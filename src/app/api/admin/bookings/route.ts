@@ -48,6 +48,7 @@ export async function POST(req: Request) {
       bookingAdvanceDays: config.advanceDays ?? 30,
       bookingEmail: config.email || "",
       bookingTimezone: config.timezone || "UTC",
+      bookingSmsNumber: config.smsNumber || "",
     })
     .where(eq(profiles.userId, userId));
 

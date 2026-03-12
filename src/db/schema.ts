@@ -15,8 +15,10 @@ export const profiles = pgTable("profiles", {
   accentColor: text("accent_color").notNull().default(""),
   bgType: text("bg_type").notNull().default("none"),
   bgValue: text("bg_value").notNull().default(""),
-  // Stripe Connect
+  // Stripe keys (user's own account)
   stripeAccountId: text("stripe_account_id").notNull().default(""),
+  stripePublishableKey: text("stripe_publishable_key").notNull().default(""),
+  stripeSecretKey: text("stripe_secret_key").notNull().default(""),
   // Email capture
   emailCaptureEnabled: boolean("email_capture_enabled").notNull().default(false),
   emailCaptureTitle: text("email_capture_title").notNull().default("Stay in the loop"),
@@ -29,6 +31,9 @@ export const profiles = pgTable("profiles", {
   bookingAdvanceDays: integer("booking_advance_days").notNull().default(30),
   bookingEmail: text("booking_email").notNull().default(""),
   bookingTimezone: text("booking_timezone").notNull().default("UTC"),
+  bookingSmsNumber: text("booking_sms_number").notNull().default(""),
+  socialLinksPosition: text("social_links_position").notNull().default("footer"), // "footer" | "bio"
+  customDomain: text("custom_domain").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -123,5 +128,8 @@ export const bookings = pgTable("bookings", {
   notes: text("notes").notNull().default(""),
   status: text("status").notNull().default("confirmed"), // "confirmed" | "cancelled"
   guestTimezone: text("guest_timezone").notNull().default("UTC"),
+  guestPhone: text("guest_phone").notNull().default(""),
+  smsReminder24hSent: boolean("sms_reminder_24h_sent").notNull().default(false),
+  smsReminder1hSent: boolean("sms_reminder_1h_sent").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });

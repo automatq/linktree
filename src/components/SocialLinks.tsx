@@ -22,7 +22,7 @@ export function SocialLinks({ links, size = "md", accentColor }: SocialLinksProp
       {links.map((link) => (
         <a
           key={link.platform}
-          href={link.url}
+          href={/^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={link.platform}

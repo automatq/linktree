@@ -28,6 +28,7 @@ export type Profile = {
   bgType?: string;
   bgValue?: string;
   stripeAccountId?: string;
+  stripePublishableKey?: string;
   emailCaptureEnabled?: boolean;
   emailCaptureTitle?: string;
   emailCaptureButtonText?: string;
@@ -38,6 +39,9 @@ export type Profile = {
   bookingAdvanceDays?: number;
   bookingEmail?: string;
   bookingTimezone?: string;
+  bookingSmsNumber?: string;
+  socialLinksPosition?: "footer" | "bio";
+  customDomain?: string;
 };
 
 export type Product = {

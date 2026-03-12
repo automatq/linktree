@@ -37,6 +37,7 @@ export function BookingClient({ username, hostName, title, duration, accentColor
 
   const [guestName, setGuestName] = useState("");
   const [guestEmail, setGuestEmail] = useState("");
+  const [guestPhone, setGuestPhone] = useState("");
   const [notes, setNotes] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [bookingId, setBookingId] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export function BookingClient({ username, hostName, title, duration, accentColor
           slotISO: selectedSlot,
           guestName,
           guestEmail,
+          guestPhone,
           notes,
           guestTimezone,
         }),
@@ -347,6 +349,18 @@ export function BookingClient({ username, hostName, title, duration, accentColor
                   value={guestEmail}
                   onChange={(e) => setGuestEmail(e.target.value)}
                   required
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-black/50 dark:text-white/50 mb-1">
+                  Phone <span className="text-black/25 dark:text-white/25 font-normal">(optional — for SMS reminders)</span>
+                </label>
+                <input
+                  type="tel"
+                  className={inputClass}
+                  placeholder="+1 555 000 0000"
+                  value={guestPhone}
+                  onChange={(e) => setGuestPhone(e.target.value)}
                 />
               </div>
               <div>

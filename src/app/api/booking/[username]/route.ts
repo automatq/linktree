@@ -4,6 +4,7 @@ import { profiles, availability, bookings } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { generateSlots } from "@/lib/slots";
 import { sendGuestConfirmation, sendHostNotification, sendGuestReminder } from "@/lib/email";
+import { sendGuestConfirmationSms, sendHostNotificationSms } from "@/lib/sms";
 
 function genId() {
   return Math.random().toString(36).slice(2, 11) + Math.random().toString(36).slice(2, 11);
@@ -15,7 +16,7 @@ export async function POST(
 ) {
   const { username } = await params;
   const body = await req.json();
-  const { slotISO, guestName, guestEmail, notes, guestTimezone } = body;
+  const { slotISO, guestName, guestEmail, notes, guestTimezone, guestPhone } = body;
 
   if (!slotISO || !guestName || !guestEmail) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -76,6 +77,7 @@ export async function POST(
     notes: notes || "",
     status: "confirmed",
     guestTimezone: guestTimezone || "UTC",
+    guestPhone: guestPhone || "",
   });
 
   // Send emails
@@ -92,9 +94,22 @@ export async function POST(
     notes,
   };
 
+  const smsData = {
+    guestName,
+    guestPhone: guestPhone || "",
+    hostName: profile.name || username,
+    hostSmsNumber: profile.bookingSmsNumber || "",
+    title: profile.bookingTitle || "Book a call",
+    startsAt,
+    guestTimezone: guestTimezone || "UTC",
+    hostTimezone: hostTz,
+  };
+
   await Promise.all([
     sendGuestConfirmation(emailData),
     sendHostNotification(emailData),
+    sendGuestConfirmationSms(smsData),
+    sendHostNotificationSms(smsData),
     // Schedule 24h reminder if the call is more than 25 hours away
     startsAt.getTime() - Date.now() > 25 * 3600 * 1000
       ? sendGuestReminder(emailData, new Date(startsAt.getTime() - 24 * 3600 * 1000))

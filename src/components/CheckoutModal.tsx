@@ -16,7 +16,7 @@ export function CheckoutModal({
   onClose: () => void;
 }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
+  const [stripePublishableKey, setStripePublishableKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,7 +29,7 @@ export function CheckoutModal({
       .then((d) => {
         if (d.clientSecret) {
           setClientSecret(d.clientSecret);
-          setStripeAccountId(d.stripeAccountId || null);
+          setStripePublishableKey(d.stripePublishableKey || null);
         } else {
           setError(d.error || "Failed to start checkout");
         }
@@ -37,13 +37,11 @@ export function CheckoutModal({
       .catch(() => setError("Failed to start checkout"));
   }, [product.id, username]);
 
-  // Create stripePromise scoped to the seller's connected account
+  // Load Stripe with the seller's own publishable key
   const stripePromise = useMemo(() => {
-    if (!stripeAccountId || !process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) return null;
-    return loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY, {
-      stripeAccount: stripeAccountId,
-    });
-  }, [stripeAccountId]);
+    if (!stripePublishableKey) return null;
+    return loadStripe(stripePublishableKey);
+  }, [stripePublishableKey]);
 
   return (
     <div

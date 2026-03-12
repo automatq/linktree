@@ -39,6 +39,7 @@ export async function GET() {
       bgType: profile.bgType,
       bgValue: profile.bgValue,
       stripeAccountId: profile.stripeAccountId,
+      stripePublishableKey: profile.stripePublishableKey,
       emailCaptureEnabled: profile.emailCaptureEnabled,
       emailCaptureTitle: profile.emailCaptureTitle,
       emailCaptureButtonText: profile.emailCaptureButtonText,
@@ -49,6 +50,9 @@ export async function GET() {
       bookingAdvanceDays: profile.bookingAdvanceDays,
       bookingEmail: profile.bookingEmail,
       bookingTimezone: profile.bookingTimezone,
+      bookingSmsNumber: profile.bookingSmsNumber,
+      socialLinksPosition: profile.socialLinksPosition as "footer" | "bio",
+      customDomain: profile.customDomain,
     },
     links: userLinks.map((l) => ({
       id: l.id,
@@ -94,6 +98,7 @@ export async function POST(req: Request) {
       accentColor: profileData.accentColor || "",
       bgType: profileData.bgType || "none",
       bgValue: profileData.bgValue || "",
+      socialLinksPosition: profileData.socialLinksPosition || "footer",
     }).returning();
     profile = created;
   } else {
@@ -110,6 +115,7 @@ export async function POST(req: Request) {
         accentColor: profileData.accentColor || "",
         bgType: profileData.bgType || "none",
         bgValue: profileData.bgValue || "",
+        socialLinksPosition: profileData.socialLinksPosition || "footer",
       })
       .where(eq(profiles.userId, userId))
       .returning();

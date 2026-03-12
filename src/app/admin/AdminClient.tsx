@@ -27,10 +27,30 @@ export function AdminClient() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [customDomain, setCustomDomain] = useState("");
+  const [savingDomain, setSavingDomain] = useState(false);
+  const [domainMsg, setDomainMsg] = useState<{ text: string; ok: boolean } | null>(null);
+  const [domainStatus, setDomainStatus] = useState<"idle" | "checking" | "active" | "pending" | "error">("idle");
+  const [domainStatusMsg, setDomainStatusMsg] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store">("content");
   const [showQR, setShowQR] = useState(false);
   const { signOut } = useClerk();
+
+  const checkDomainStatus = useCallback(async (domain: string) => {
+    if (!domain) return;
+    setDomainStatus("checking");
+    setDomainStatusMsg(null);
+    try {
+      const res = await fetch(`/api/admin/domain/verify?domain=${encodeURIComponent(domain)}`);
+      const d = await res.json();
+      setDomainStatus(d.status);
+      setDomainStatusMsg(d.message + (d.hint ? ` — ${d.hint}` : ""));
+    } catch {
+      setDomainStatus("error");
+      setDomainStatusMsg("Could not check domain status.");
+    }
+  }, []);
 
   useEffect(() => {
     Promise.all([
@@ -39,9 +59,14 @@ export function AdminClient() {
     ]).then(([d, s]) => {
       setData(d);
       if (d.profile?.username) setUsername(d.profile.username);
+      if (d.profile?.customDomain) {
+        setCustomDomain(d.profile.customDomain);
+        // Auto-check status on load if domain is set
+        checkDomainStatus(d.profile.customDomain);
+      }
       setStats(s);
     });
-  }, []);
+  }, [checkDomainStatus]);
 
   const save = useCallback(async (next: LinksData) => {
     setSaving(true);
@@ -221,20 +246,6 @@ export function AdminClient() {
             </nav>
           </div>
           <div className="flex items-center gap-2">
-            {(tab === "content") && (
-              <>
-                <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "text-black/0 dark:text-white/0"}`}>
-                  Saved
-                </span>
-                <button
-                  onClick={() => save(data!)}
-                  disabled={saving}
-                  className="flex h-7 items-center gap-1.5 rounded-md bg-black px-3 text-xs font-medium text-white transition-opacity hover:opacity-80 disabled:opacity-40 dark:bg-white dark:text-black"
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              </>
-            )}
             <button
               onClick={() => signOut({ redirectUrl: "/" })}
               className="flex h-7 items-center rounded-md border border-black/10 dark:border-white/10 px-3 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
@@ -251,7 +262,18 @@ export function AdminClient() {
         {tab === "content" && (
           <>
             {/* Profile section */}
-            <Section title="Profile">
+            <Section title="Profile" action={
+              <div className="flex items-center gap-2">
+                <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+                <button
+                  onClick={() => save(data!)}
+                  disabled={saving}
+                  className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : "Save"}
+                </button>
+              </div>
+            }>
               <div className="flex gap-4 items-start">
                 <AvatarUpload
                   avatarUrl={data.profile.avatarUrl}
@@ -306,6 +328,170 @@ export function AdminClient() {
                 onTypeChange={(v) => updateProfile("bgType", v)}
                 onValueChange={(v) => updateProfile("bgValue", v)}
               />
+            </Section>
+
+            {/* Custom domain section */}
+            <Section
+              title="Custom Domain"
+              action={
+                customDomain ? (
+                  <button
+                    onClick={async () => {
+                      setSavingDomain(true);
+                      await fetch("/api/admin/domain", { method: "DELETE" });
+                      setCustomDomain("");
+                      setSavingDomain(false);
+                      setDomainStatus("idle");
+                      setDomainStatusMsg(null);
+                      setDomainMsg({ text: "Domain removed", ok: true });
+                      setTimeout(() => setDomainMsg(null), 3000);
+                    }}
+                    disabled={savingDomain}
+                    className="text-xs text-black/30 dark:text-white/30 hover:text-red-400 transition-colors disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                ) : null
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-black/40 dark:text-white/40">
+                  Use your own domain (e.g. <span className="font-mono">links.yoursite.com</span>) for your profile page.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    className="h-8 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                    value={customDomain}
+                    onChange={(e) => { setCustomDomain(e.target.value); setDomainStatus("idle"); setDomainStatusMsg(null); }}
+                    placeholder="links.yoursite.com"
+                  />
+                  <button
+                    onClick={async () => {
+                      setSavingDomain(true);
+                      setDomainMsg(null);
+                      setDomainStatus("idle");
+                      const res = await fetch("/api/admin/domain", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ domain: customDomain }),
+                      });
+                      const d = await res.json();
+                      setSavingDomain(false);
+                      if (res.ok) {
+                        setCustomDomain(d.domain);
+                        setDomainMsg({ text: "Saved! Now set up DNS below.", ok: true });
+                        setTimeout(() => setDomainMsg(null), 5000);
+                        await checkDomainStatus(d.domain);
+                      } else {
+                        setDomainMsg({ text: d.error || "Failed to save", ok: false });
+                        setTimeout(() => setDomainMsg(null), 6000);
+                      }
+                    }}
+                    disabled={savingDomain || !customDomain.trim()}
+                    className="flex h-8 items-center rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                  >
+                    {savingDomain ? "Saving..." : "Save"}
+                  </button>
+                </div>
+                {domainMsg && (
+                  <p className={`text-xs ${domainMsg.ok ? "text-emerald-500" : "text-red-500"}`}>
+                    {domainMsg.text}
+                  </p>
+                )}
+
+                {/* Domain status indicator */}
+                {customDomain && domainStatus !== "idle" && (
+                  <div className={`flex items-start gap-2 rounded-lg p-3 text-xs ${
+                    domainStatus === "active"
+                      ? "bg-emerald-50 dark:bg-emerald-900/20"
+                      : domainStatus === "error"
+                      ? "bg-red-50 dark:bg-red-900/20"
+                      : "bg-amber-50 dark:bg-amber-900/20"
+                  }`}>
+                    {domainStatus === "checking" ? (
+                      <svg className="animate-spin shrink-0 mt-0.5" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                      </svg>
+                    ) : domainStatus === "active" ? (
+                      <svg className="shrink-0 mt-0.5 text-emerald-500" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    ) : (
+                      <svg className={`shrink-0 mt-0.5 ${domainStatus === "error" ? "text-red-500" : "text-amber-500"}`} width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                      </svg>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium ${
+                        domainStatus === "active" ? "text-emerald-700 dark:text-emerald-400"
+                        : domainStatus === "error" ? "text-red-700 dark:text-red-400"
+                        : domainStatus === "checking" ? "text-black/50 dark:text-white/50"
+                        : "text-amber-700 dark:text-amber-400"
+                      }`}>
+                        {domainStatus === "active" ? "Connected" : domainStatus === "checking" ? "Checking..." : domainStatus === "error" ? "Error" : "Pending DNS"}
+                      </p>
+                      {domainStatusMsg && <p className="text-black/40 dark:text-white/40 mt-0.5">{domainStatusMsg}</p>}
+                    </div>
+                    {domainStatus !== "checking" && domainStatus !== "active" && (
+                      <button
+                        onClick={() => checkDomainStatus(customDomain)}
+                        className="shrink-0 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors underline underline-offset-2"
+                      >
+                        Retry
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* DNS setup instructions - shown until domain is active */}
+                {customDomain && domainStatus !== "active" && (
+                  <div className="rounded-lg bg-black/4 dark:bg-white/4 p-3 flex flex-col gap-2 text-xs">
+                    <p className="font-medium text-black/70 dark:text-white/70">Step 1 - Add a CNAME record at your DNS provider</p>
+                    {[
+                      { label: "Type", value: "CNAME" },
+                      { label: "Name", value: customDomain.split(".").length > 2 ? customDomain.split(".")[0] : "@" },
+                      { label: "Value", value: "cname.vercel-dns.com" },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="flex items-center gap-2">
+                        <span className="text-black/40 dark:text-white/40 w-10 shrink-0">{label}</span>
+                        <span className="font-mono text-black dark:text-white flex-1 truncate">{value}</span>
+                        <button
+                          onClick={() => navigator.clipboard.writeText(value)}
+                          className="shrink-0 text-black/25 dark:text-white/25 hover:text-black dark:hover:text-white transition-colors"
+                          title="Copy"
+                        >
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2 2v1"/>
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                    <p className="text-black/30 dark:text-white/30 pt-1">Step 2 - DNS changes can take a few minutes to 48 hours to propagate.</p>
+                    <button
+                      onClick={() => checkDomainStatus(customDomain)}
+                      disabled={domainStatus === "checking"}
+                      className="mt-1 self-start flex h-7 items-center rounded-md bg-black/8 dark:bg-white/8 px-3 text-xs font-medium text-black dark:text-white hover:bg-black/12 dark:hover:bg-white/12 transition-colors disabled:opacity-50"
+                    >
+                      {domainStatus === "checking" ? "Checking..." : "Check status"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Active domain - show quick link */}
+                {customDomain && domainStatus === "active" && (
+                  <a
+                    href={`https://${customDomain}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
+                    Visit {customDomain}
+                  </a>
+                )}
+              </div>
             </Section>
 
             {/* Links section */}
@@ -390,12 +576,29 @@ export function AdminClient() {
             <Section
               title="Social Links"
               action={
-                <button
-                  onClick={addSocial}
-                  className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                >
-                  <span className="text-base leading-none">+</span> Add
-                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1 rounded-lg border border-black/10 dark:border-white/10 p-0.5 text-[11px]">
+                    {(["footer", "bio"] as const).map((pos) => (
+                      <button
+                        key={pos}
+                        onClick={() => updateProfile("socialLinksPosition", pos)}
+                        className={`px-2.5 py-0.5 rounded-md capitalize transition-colors ${
+                          (data.profile.socialLinksPosition ?? "footer") === pos
+                            ? "bg-black dark:bg-white text-white dark:text-black font-medium"
+                            : "text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"
+                        }`}
+                      >
+                        {pos === "footer" ? "Footer" : "Under bio"}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={addSocial}
+                    className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    <span className="text-base leading-none">+</span> Add
+                  </button>
+                </div>
               }
             >
               <div className="flex flex-col gap-2">
@@ -463,6 +666,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [advanceDays, setAdvanceDays] = useState(profile.bookingAdvanceDays ?? 30);
   const [email, setEmail] = useState(profile.bookingEmail ?? "");
   const [timezone, setTimezone] = useState(profile.bookingTimezone ?? "UTC");
+  const [smsNumber, setSmsNumber] = useState(profile.bookingSmsNumber ?? "");
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [bookingsList, setBookingsList] = useState<BookingRecord[]>([]);
   const [saving, setSaving] = useState(false);
@@ -499,7 +703,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        config: { enabled, title, duration, buffer, advanceDays, email, timezone },
+        config: { enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber },
         windows,
       }),
     });
@@ -614,16 +818,28 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
                 </div>
               </div>
 
-              {/* Notification email */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Notification email</label>
-                <input
-                  type="email"
-                  className={inputClass + " w-full"}
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                />
+              {/* Notification email + SMS */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Notification email</label>
+                  <input
+                    type="email"
+                    className={inputClass + " w-full"}
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">SMS number (host)</label>
+                  <input
+                    type="tel"
+                    className={inputClass + " w-full"}
+                    value={smsNumber}
+                    onChange={(e) => setSmsNumber(e.target.value)}
+                    placeholder="+1 555 000 0000"
+                  />
+                </div>
               </div>
             </>
           )}
@@ -790,9 +1006,13 @@ type ProductRow = {
 type SubscriberRow = { id: string; email: string; name: string; subscribedAt: string | null };
 
 function StoreTab({ profile, username }: { profile: import("@/data/links").Profile; username: string }) {
-  // Stripe Connect state
-  const [stripeAccountId, setStripeAccountId] = useState(profile.stripeAccountId ?? "");
-  const [disconnecting, setDisconnecting] = useState(false);
+  // Stripe keys state
+  const [stripePublishableKey, setStripePublishableKey] = useState(profile.stripePublishableKey ?? "");
+  const [stripeSecretKey, setStripeSecretKey] = useState("");
+  const [stripeSecretKeySet, setStripeSecretKeySet] = useState(false);
+  const [savingStripe, setSavingStripe] = useState(false);
+  const [stripeSavedMsg, setStripeSavedMsg] = useState(false);
+  const [stripeError, setStripeError] = useState("");
 
   // Email capture state
   const [emailEnabled, setEmailEnabled] = useState(profile.emailCaptureEnabled ?? false);
@@ -808,31 +1028,20 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
 
-  // Handle ?stripe=connected/error redirect after OAuth
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const stripeParam = params.get("stripe");
-    if (stripeParam === "connected") {
-      // Refetch profile to get new stripeAccountId
-      fetch("/api/data").then((r) => r.json()).then((d) => {
-        setStripeAccountId(d.profile?.stripeAccountId ?? "");
-      });
-      window.history.replaceState({}, "", "/admin");
-    } else if (stripeParam === "error") {
-      window.history.replaceState({}, "", "/admin");
-    }
-  }, []);
-
   useEffect(() => {
     fetch("/api/admin/products").then((r) => r.json()).then((d) => {
       setProds((d.products || []).map((p: ProductRow & { price: number }) => ({
-        ...p, price: p.price / 100, // cents → dollars for display
+        ...p, price: p.price / 100,
       })));
       setLoadingProds(false);
     });
     fetch("/api/admin/subscribers").then((r) => r.json()).then((d) => {
       setSubscribers(d.subscribers || []);
       setLoadingSubs(false);
+    });
+    fetch("/api/admin/stripe-keys").then((r) => r.json()).then((d) => {
+      if (d.publishableKey) setStripePublishableKey(d.publishableKey);
+      setStripeSecretKeySet(!!d.secretKeySet);
     });
   }, []);
 
@@ -862,11 +1071,21 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
     setProds(arr);
   }
 
-  async function handleDisconnect() {
-    setDisconnecting(true);
-    await fetch("/api/stripe/disconnect", { method: "POST" });
-    setStripeAccountId("");
-    setDisconnecting(false);
+  async function handleSaveStripeKeys() {
+    setStripeError("");
+    setSavingStripe(true);
+    const res = await fetch("/api/admin/stripe-keys", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ publishableKey: stripePublishableKey, secretKey: stripeSecretKey }),
+    });
+    const data = await res.json();
+    setSavingStripe(false);
+    if (!res.ok) { setStripeError(data.error || "Failed to save"); return; }
+    if (stripeSecretKey) setStripeSecretKeySet(true);
+    setStripeSecretKey("");
+    setStripeSavedMsg(true);
+    setTimeout(() => setStripeSavedMsg(false), 2000);
   }
 
   async function handleSave() {
@@ -917,46 +1136,51 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Stripe Connect section */}
-      <Section title="Payments">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-black dark:text-white">
-              {stripeAccountId ? "Stripe connected" : "Connect Stripe"}
-            </p>
-            <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
-              {stripeAccountId
-                ? `Account ${stripeAccountId} — payments go directly to your Stripe account`
-                : "Connect your Stripe account so buyers pay you directly"}
-            </p>
-          </div>
-          {stripeAccountId ? (
-            <div className="flex items-center gap-3 shrink-0">
-              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span className="text-xs font-medium">Connected</span>
-              </div>
-              <button
-                onClick={handleDisconnect}
-                disabled={disconnecting}
-                className="text-xs text-black/30 dark:text-white/30 hover:text-red-400 dark:hover:text-red-400 transition-colors disabled:opacity-50"
-              >
-                {disconnecting ? "Disconnecting…" : "Disconnect"}
-              </button>
-            </div>
-          ) : (
-            <a
-              href="/api/stripe/connect"
-              className="flex h-8 items-center gap-2 rounded-lg bg-[#635BFF] px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90 shrink-0"
+      {/* Stripe keys section */}
+      <Section
+        title="Payments"
+        action={
+          <div className="flex items-center gap-2">
+            <span className={`text-xs transition-all duration-300 ${stripeSavedMsg ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+            <button
+              onClick={handleSaveStripeKeys}
+              disabled={savingStripe}
+              className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z" />
-              </svg>
-              Connect Stripe
-            </a>
-          )}
+              {savingStripe ? "Saving…" : "Save"}
+            </button>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <p className="text-xs text-black/40 dark:text-white/40">
+            Paste your Stripe API keys — payments go directly to your account. Get them from{" "}
+            <a href="https://dashboard.stripe.com/apikeys" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">dashboard.stripe.com/apikeys</a>.
+          </p>
+          {stripeError && <p className="text-xs text-red-500">{stripeError}</p>}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Publishable key (pk_…)</label>
+              <input
+                className={inputClass + " w-full font-mono"}
+                value={stripePublishableKey}
+                onChange={(e) => setStripePublishableKey(e.target.value)}
+                placeholder="pk_live_..."
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">
+                Secret key (sk_…){stripeSecretKeySet && <span className="ml-1.5 text-emerald-500">✓ set</span>}
+              </label>
+              <input
+                type="password"
+                className={inputClass + " w-full font-mono"}
+                value={stripeSecretKey}
+                onChange={(e) => setStripeSecretKey(e.target.value)}
+                placeholder={stripeSecretKeySet ? "Leave blank to keep existing" : "sk_live_..."}
+              />
+            </div>
+          </div>
         </div>
       </Section>
 

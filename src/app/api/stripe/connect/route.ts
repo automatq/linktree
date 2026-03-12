@@ -21,7 +21,7 @@ export async function GET(req: Request) {
     state: userId,
   });
 
-  return NextResponse.redirect(
-    `https://connect.stripe.com/oauth/authorize?${params.toString()}`
-  );
+  return NextResponse.json({
+    url: `https://connect.stripe.com/oauth/authorize?${params.toString()}`,
+  });
 }

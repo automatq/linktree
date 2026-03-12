@@ -9,11 +9,6 @@ function genId() {
 }
 
 export async function POST(req: Request) {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return NextResponse.json({ error: "Stripe not configured" }, { status: 503 });
-  }
-
-  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
   const { productId, username } = await req.json();
 
   const profile = await db.query.profiles.findFirst({
@@ -21,8 +16,8 @@ export async function POST(req: Request) {
   });
   if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (!profile.stripeAccountId) {
-    return NextResponse.json({ error: "Seller has not connected Stripe" }, { status: 503 });
+  if (!profile.stripeSecretKey) {
+    return NextResponse.json({ error: "Seller has not set up payments yet" }, { status: 503 });
   }
 
   const product = await db.query.products.findFirst({
@@ -32,34 +27,30 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
+  const stripe = new Stripe(profile.stripeSecretKey);
   const orderId = genId();
   const origin = new URL(req.url).origin;
 
-  // Create session on the seller's connected Stripe account
-  const session = await stripe.checkout.sessions.create(
-    {
-      ui_mode: "embedded",
-      mode: "payment",
-      line_items: [
-        {
-          price_data: {
-            currency: product.currency,
-            product_data: {
-              name: product.title,
-              description: product.description || undefined,
-              images: product.coverUrl ? [product.coverUrl] : [],
-            },
-            unit_amount: product.price,
+  const session = await stripe.checkout.sessions.create({
+    ui_mode: "embedded",
+    mode: "payment",
+    line_items: [
+      {
+        price_data: {
+          currency: product.currency,
+          product_data: {
+            name: product.title,
+            description: product.description || undefined,
+            images: product.coverUrl ? [product.coverUrl] : [],
           },
-          quantity: 1,
+          unit_amount: product.price,
         },
-      ],
-      return_url: `${origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
-    },
-    { stripeAccount: profile.stripeAccountId }
-  );
+        quantity: 1,
+      },
+    ],
+    return_url: `${origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
+  });
 
-  // Pre-create order as pending
   await db.insert(orders).values({
     id: orderId,
     productId: product.id,
@@ -71,6 +62,6 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     clientSecret: session.client_secret,
-    stripeAccountId: profile.stripeAccountId,
+    stripePublishableKey: profile.stripePublishableKey,
   });
 }
