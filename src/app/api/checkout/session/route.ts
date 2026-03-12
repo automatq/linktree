@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { db } from "@/db";
-import { orders, products } from "@/db/schema";
+import { orders, products, profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export async function GET(req: Request) {
@@ -17,16 +17,24 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Missing params" }, { status: 400 });
   }
 
+  const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId) });
+  if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+  // Get the seller's connected account ID
+  const profile = await db.query.profiles.findFirst({ where: eq(profiles.id, order.profileId) });
+
   const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-  const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+  // Retrieve session from the connected account
+  const sessionOptions = profile?.stripeAccountId
+    ? { stripeAccount: profile.stripeAccountId }
+    : undefined;
+
+  const session = await stripe.checkout.sessions.retrieve(sessionId, {}, sessionOptions);
 
   if (session.payment_status !== "paid") {
     return NextResponse.json({ paid: false });
   }
-
-  // Update order to paid + capture email
-  const order = await db.query.orders.findFirst({ where: eq(orders.id, orderId) });
-  if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
   if (order.status !== "paid") {
     await db.update(orders)

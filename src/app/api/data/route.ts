@@ -38,6 +38,7 @@ export async function GET() {
       accentColor: profile.accentColor,
       bgType: profile.bgType,
       bgValue: profile.bgValue,
+      stripeAccountId: profile.stripeAccountId,
       emailCaptureEnabled: profile.emailCaptureEnabled,
       emailCaptureTitle: profile.emailCaptureTitle,
       emailCaptureButtonText: profile.emailCaptureButtonText,

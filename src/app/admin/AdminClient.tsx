@@ -713,6 +713,10 @@ type ProductRow = {
 type SubscriberRow = { id: string; email: string; name: string; subscribedAt: string | null };
 
 function StoreTab({ profile, username }: { profile: import("@/data/links").Profile; username: string }) {
+  // Stripe Connect state
+  const [stripeAccountId, setStripeAccountId] = useState(profile.stripeAccountId ?? "");
+  const [disconnecting, setDisconnecting] = useState(false);
+
   // Email capture state
   const [emailEnabled, setEmailEnabled] = useState(profile.emailCaptureEnabled ?? false);
   const [emailTitle, setEmailTitle] = useState(profile.emailCaptureTitle ?? "Stay in the loop");
@@ -726,6 +730,21 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
 
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState(false);
+
+  // Handle ?stripe=connected/error redirect after OAuth
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const stripeParam = params.get("stripe");
+    if (stripeParam === "connected") {
+      // Refetch profile to get new stripeAccountId
+      fetch("/api/data").then((r) => r.json()).then((d) => {
+        setStripeAccountId(d.profile?.stripeAccountId ?? "");
+      });
+      window.history.replaceState({}, "", "/admin");
+    } else if (stripeParam === "error") {
+      window.history.replaceState({}, "", "/admin");
+    }
+  }, []);
 
   useEffect(() => {
     fetch("/api/admin/products").then((r) => r.json()).then((d) => {
@@ -764,6 +783,13 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
     if (next < 0 || next >= arr.length) return;
     [arr[idx], arr[next]] = [arr[next], arr[idx]];
     setProds(arr);
+  }
+
+  async function handleDisconnect() {
+    setDisconnecting(true);
+    await fetch("/api/stripe/disconnect", { method: "POST" });
+    setStripeAccountId("");
+    setDisconnecting(false);
   }
 
   async function handleSave() {
@@ -819,6 +845,49 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Stripe Connect section */}
+      <Section title="Payments">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-black dark:text-white">
+              {stripeAccountId ? "Stripe connected" : "Connect Stripe"}
+            </p>
+            <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
+              {stripeAccountId
+                ? `Account ${stripeAccountId} — payments go directly to your Stripe account`
+                : "Connect your Stripe account so buyers pay you directly"}
+            </p>
+          </div>
+          {stripeAccountId ? (
+            <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span className="text-xs font-medium">Connected</span>
+              </div>
+              <button
+                onClick={handleDisconnect}
+                disabled={disconnecting}
+                className="text-xs text-black/30 dark:text-white/30 hover:text-red-400 dark:hover:text-red-400 transition-colors disabled:opacity-50"
+              >
+                {disconnecting ? "Disconnecting…" : "Disconnect"}
+              </button>
+            </div>
+          ) : (
+            <a
+              href="/api/stripe/connect"
+              className="flex h-8 items-center gap-2 rounded-lg bg-[#635BFF] px-4 text-xs font-semibold text-white transition-opacity hover:opacity-90 shrink-0"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z" />
+              </svg>
+              Connect Stripe
+            </a>
+          )}
+        </div>
+      </Section>
+
       {/* Products section */}
       <Section
         title="Products"

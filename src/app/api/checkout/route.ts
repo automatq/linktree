@@ -21,6 +21,10 @@ export async function POST(req: Request) {
   });
   if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
+  if (!profile.stripeAccountId) {
+    return NextResponse.json({ error: "Seller has not connected Stripe" }, { status: 503 });
+  }
+
   const product = await db.query.products.findFirst({
     where: eq(products.id, productId),
   });
@@ -29,27 +33,31 @@ export async function POST(req: Request) {
   }
 
   const orderId = genId();
-  const origin = req.headers.get("origin") || "https://trilink-nine-neon.vercel.app";
+  const origin = new URL(req.url).origin;
 
-  const session = await stripe.checkout.sessions.create({
-    ui_mode: "embedded",
-    mode: "payment",
-    line_items: [
-      {
-        price_data: {
-          currency: product.currency,
-          product_data: {
-            name: product.title,
-            description: product.description || undefined,
-            images: product.coverUrl ? [product.coverUrl] : [],
+  // Create session on the seller's connected Stripe account
+  const session = await stripe.checkout.sessions.create(
+    {
+      ui_mode: "embedded",
+      mode: "payment",
+      line_items: [
+        {
+          price_data: {
+            currency: product.currency,
+            product_data: {
+              name: product.title,
+              description: product.description || undefined,
+              images: product.coverUrl ? [product.coverUrl] : [],
+            },
+            unit_amount: product.price,
           },
-          unit_amount: product.price,
+          quantity: 1,
         },
-        quantity: 1,
-      },
-    ],
-    return_url: `${origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
-  });
+      ],
+      return_url: `${origin}/purchase/success?session_id={CHECKOUT_SESSION_ID}&order_id=${orderId}`,
+    },
+    { stripeAccount: profile.stripeAccountId }
+  );
 
   // Pre-create order as pending
   await db.insert(orders).values({
@@ -61,5 +69,8 @@ export async function POST(req: Request) {
     status: "pending",
   });
 
-  return NextResponse.json({ clientSecret: session.client_secret });
+  return NextResponse.json({
+    clientSecret: session.client_secret,
+    stripeAccountId: profile.stripeAccountId,
+  });
 }

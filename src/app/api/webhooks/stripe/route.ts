@@ -21,10 +21,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
+  // Handle events from connected accounts (Connect webhooks)
   if (event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
 
-    // Find order by stripe session id
     const order = await db.query.orders.findFirst({
       where: eq(orders.stripeSessionId, session.id),
     });
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
           subject: `Your download: ${product.title}`,
           html: `
             <p>Hi${session.customer_details.name ? ` ${session.customer_details.name}` : ""},</p>
-            <p>Thanks for your purchase! Here's your download link for <strong>${product.title}</strong>:</p>
+            <p>Thanks for your purchase! Here is your download link for <strong>${product.title}</strong>:</p>
             <p><a href="${product.fileUrl}" style="background:#000;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block;">Download ${product.title}</a></p>
             <p style="color:#999;font-size:12px;">Keep this email — you can re-download any time.</p>
           `,

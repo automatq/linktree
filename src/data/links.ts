@@ -27,6 +27,7 @@ export type Profile = {
   accentColor?: string;
   bgType?: string;
   bgValue?: string;
+  stripeAccountId?: string;
   emailCaptureEnabled?: boolean;
   emailCaptureTitle?: string;
   emailCaptureButtonText?: string;

@@ -15,6 +15,8 @@ export const profiles = pgTable("profiles", {
   accentColor: text("accent_color").notNull().default(""),
   bgType: text("bg_type").notNull().default("none"),
   bgValue: text("bg_value").notNull().default(""),
+  // Stripe Connect
+  stripeAccountId: text("stripe_account_id").notNull().default(""),
   // Email capture
   emailCaptureEnabled: boolean("email_capture_enabled").notNull().default(false),
   emailCaptureTitle: text("email_capture_title").notNull().default("Stay in the loop"),
