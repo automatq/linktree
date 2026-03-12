@@ -25,9 +25,13 @@ export default clerkMiddleware(async (auth, req) => {
         LIMIT 1
       `;
       if (rows.length > 0) {
-        const url = req.nextUrl.clone();
-        url.pathname = `/${rows[0].username}`;
-        return NextResponse.rewrite(url);
+        const { pathname } = req.nextUrl;
+        // Only rewrite the root path — API routes, /book/, /admin, etc. pass through as-is
+        if (pathname === "/" || pathname === "") {
+          const url = req.nextUrl.clone();
+          url.pathname = `/${rows[0].username}`;
+          return NextResponse.rewrite(url);
+        }
       }
     } catch {
       // If DB lookup fails, fall through to normal routing
