@@ -45,6 +45,9 @@ export type Profile = {
   tipJarEnabled?: boolean;
   tipJarTitle?: string;
   tipJarAmounts?: string;
+  metaPixelId?: string;
+  tiktokPixelId?: string;
+  googleTagId?: string;
 };
 
 export type Product = {

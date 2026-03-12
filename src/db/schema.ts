@@ -37,6 +37,10 @@ export const profiles = pgTable("profiles", {
   tipJarEnabled: boolean("tip_jar_enabled").notNull().default(false),
   tipJarTitle: text("tip_jar_title").notNull().default("Support my work"),
   tipJarAmounts: text("tip_jar_amounts").notNull().default("3,5,10,25"),
+  // Retargeting pixels
+  metaPixelId: text("meta_pixel_id").notNull().default(""),
+  tiktokPixelId: text("tiktok_pixel_id").notNull().default(""),
+  googleTagId: text("google_tag_id").notNull().default(""),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("profiles_custom_domain_idx").on(t.customDomain),

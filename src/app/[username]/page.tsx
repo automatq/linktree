@@ -16,6 +16,7 @@ import { EmbedCard } from "@/components/EmbedCard";
 import { ProductCard } from "@/components/ProductCard";
 import { EmailCaptureWidget } from "@/components/EmailCaptureWidget";
 import { TipJarWidget } from "@/components/TipJarWidget";
+import { PixelScripts } from "@/components/PixelScripts";
 import { BookingClient } from "@/app/book/[username]/BookingClient";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 
@@ -105,6 +106,11 @@ export default async function ProfilePage({
 
   return (
     <div className={`min-h-screen transition-colors duration-200 ${hasBg ? "" : "bg-white dark:bg-black"}`} style={{ fontFamily }}>
+      <PixelScripts
+        metaPixelId={profile.metaPixelId || undefined}
+        tiktokPixelId={profile.tiktokPixelId || undefined}
+        googleTagId={profile.googleTagId || undefined}
+      />
       {/* Background layer — always behind everything */}
       {hasBg && (
         <div

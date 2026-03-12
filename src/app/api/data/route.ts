@@ -56,6 +56,9 @@ export async function GET() {
       tipJarEnabled: profile.tipJarEnabled,
       tipJarTitle: profile.tipJarTitle,
       tipJarAmounts: profile.tipJarAmounts,
+      metaPixelId: profile.metaPixelId,
+      tiktokPixelId: profile.tiktokPixelId,
+      googleTagId: profile.googleTagId,
     },
     links: userLinks.map((l) => ({
       id: l.id,

@@ -38,6 +38,11 @@ export function AdminClient() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store">("content");
   const [showQR, setShowQR] = useState(false);
+  const [metaPixelId, setMetaPixelId] = useState("");
+  const [tiktokPixelId, setTiktokPixelId] = useState("");
+  const [googleTagId, setGoogleTagId] = useState("");
+  const [pixelSaving, setPixelSaving] = useState(false);
+  const [pixelSaved, setPixelSaved] = useState(false);
   const { signOut } = useClerk();
 
   const checkDomainStatus = useCallback(async (domain: string) => {
@@ -67,6 +72,9 @@ export function AdminClient() {
         // Auto-check status on load if domain is set
         checkDomainStatus(d.profile.customDomain);
       }
+      if (d.profile?.metaPixelId) setMetaPixelId(d.profile.metaPixelId);
+      if (d.profile?.tiktokPixelId) setTiktokPixelId(d.profile.tiktokPixelId);
+      if (d.profile?.googleTagId) setGoogleTagId(d.profile.googleTagId);
       setStats(s);
     });
   }, [checkDomainStatus]);
@@ -498,6 +506,54 @@ export function AdminClient() {
                     onChange={(f, v) => updateSocial(social.platform, f, v)}
                     onDelete={() => deleteSocial(social.platform)}
                   />
+                ))}
+              </div>
+            </Section>
+
+            {/* Pixels section */}
+            <Section
+              title="Pixels"
+              action={
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs transition-all duration-300 ${pixelSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+                  <button
+                    onClick={async () => {
+                      setPixelSaving(true);
+                      await fetch("/api/admin/pixels", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ metaPixelId, tiktokPixelId, googleTagId }),
+                      });
+                      setPixelSaving(false);
+                      setPixelSaved(true);
+                      setTimeout(() => setPixelSaved(false), 2000);
+                    }}
+                    disabled={pixelSaving}
+                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                  >
+                    {pixelSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-col gap-3">
+                <p className="text-xs text-black/40 dark:text-white/40">
+                  Paste your pixel or tag IDs below. They fire on every visit to your profile — no code needed.
+                </p>
+                {[
+                  { label: "Meta (Facebook) Pixel ID", value: metaPixelId, set: setMetaPixelId, placeholder: "1234567890123456" },
+                  { label: "TikTok Pixel ID", value: tiktokPixelId, set: setTiktokPixelId, placeholder: "CXXXXXXXXXXXXXXXXX" },
+                  { label: "Google Tag ID", value: googleTagId, set: setGoogleTagId, placeholder: "G-XXXXXXXXXX or AW-XXXXXXXXXX" },
+                ].map(({ label, value, set, placeholder }) => (
+                  <div key={label} className="flex flex-col gap-1">
+                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">{label}</label>
+                    <input
+                      className={`h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors font-mono`}
+                      value={value}
+                      onChange={(e) => set(e.target.value)}
+                      placeholder={placeholder}
+                    />
+                  </div>
                 ))}
               </div>
             </Section>
