@@ -70,7 +70,7 @@ export function AdminClient() {
     setData(next);
   }
 
-  function updateLink(id: string, field: string, value: string) {
+  function updateLink(id: string, field: string, value: string | null) {
     const next = {
       ...data!,
       links: data!.links.map((l) => (l.id === id ? { ...l, [field]: value } : l)),
@@ -631,6 +631,22 @@ function IconSelect({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function getScheduleStatus(link: Link): "scheduled" | "active" | "expired" | null {
+  const now = new Date();
+  if (!link.startsAt && !link.endsAt) return null;
+  if (link.endsAt && new Date(link.endsAt) < now) return "expired";
+  if (link.startsAt && new Date(link.startsAt) > now) return "scheduled";
+  return "active";
+}
+
 function LinkRow({
   link,
   clickCount,
@@ -644,10 +660,14 @@ function LinkRow({
   clickCount: number;
   isFirst: boolean;
   isLast: boolean;
-  onChange: (field: string, value: string) => void;
+  onChange: (field: string, value: string | null) => void;
   onDelete: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {
+  const [showSchedule, setShowSchedule] = useState(false);
+  const scheduleStatus = getScheduleStatus(link);
+  const hasSchedule = !!(link.startsAt || link.endsAt);
+
   return (
     <div className="rounded-lg border border-black/8 dark:border-white/8 bg-white dark:bg-black p-3 flex flex-col gap-2">
       <div className="flex items-center gap-2">
@@ -701,6 +721,72 @@ function LinkRow({
           {clickCount.toLocaleString()}
         </span>
       </div>
+
+      {/* Schedule toggle row */}
+      <div className="pl-7 flex items-center gap-2">
+        <button
+          onClick={() => setShowSchedule((s) => !s)}
+          className={`flex items-center gap-1 text-[11px] transition-colors ${
+            hasSchedule
+              ? "text-black/50 dark:text-white/50"
+              : "text-black/20 dark:text-white/20 hover:text-black/50 dark:hover:text-white/50"
+          }`}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
+          </svg>
+          Schedule
+        </button>
+        {scheduleStatus === "scheduled" && (
+          <span className="text-[10px] bg-amber-500/10 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full font-medium">Scheduled</span>
+        )}
+        {scheduleStatus === "active" && (
+          <span className="text-[10px] bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-medium">Active</span>
+        )}
+        {scheduleStatus === "expired" && (
+          <span className="text-[10px] bg-black/8 dark:bg-white/8 text-black/30 dark:text-white/30 px-1.5 py-0.5 rounded-full font-medium">Expired</span>
+        )}
+      </div>
+
+      {showSchedule && (
+        <div className="pl-7 flex flex-col gap-2 border-t border-black/5 dark:border-white/5 pt-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/30 dark:text-white/30 uppercase tracking-wider">Show after</label>
+              <input
+                type="datetime-local"
+                value={toDatetimeLocal(link.startsAt)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onChange("startsAt", v ? new Date(v).toISOString() : null);
+                }}
+                className="h-8 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] text-black/30 dark:text-white/30 uppercase tracking-wider">Hide after</label>
+              <input
+                type="datetime-local"
+                value={toDatetimeLocal(link.endsAt)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  onChange("endsAt", v ? new Date(v).toISOString() : null);
+                }}
+                className="h-8 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+              />
+            </div>
+          </div>
+          {hasSchedule && (
+            <button
+              onClick={() => { onChange("startsAt", null); onChange("endsAt", null); }}
+              className="self-start text-[10px] text-black/25 dark:text-white/25 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+            >
+              Clear schedule
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -716,7 +802,7 @@ function SectionRow({
   link: Link;
   isFirst: boolean;
   isLast: boolean;
-  onChange: (field: string, value: string) => void;
+  onChange: (field: string, value: string | null) => void;
   onDelete: () => void;
   onMove: (dir: -1 | 1) => void;
 }) {

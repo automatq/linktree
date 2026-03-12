@@ -5,6 +5,8 @@ export type Link = {
   url: string;
   icon?: string;
   type?: "link" | "header";
+  startsAt?: string | null;
+  endsAt?: string | null;
 };
 
 export type SocialLink = {

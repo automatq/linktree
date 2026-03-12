@@ -24,6 +24,8 @@ export const links = pgTable("links", {
   icon: text("icon").notNull().default("globe"),
   position: integer("position").notNull().default(0),
   type: text("type").notNull().default("link"),
+  startsAt: timestamp("starts_at"),
+  endsAt: timestamp("ends_at"),
 });
 
 export const socialLinks = pgTable("social_links", {

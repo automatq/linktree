@@ -44,6 +44,8 @@ export async function GET() {
       url: l.url,
       icon: l.icon,
       type: l.type,
+      startsAt: l.startsAt ? l.startsAt.toISOString() : null,
+      endsAt: l.endsAt ? l.endsAt.toISOString() : null,
     })),
     socialLinks: userSocials.map((s) => ({
       platform: s.platform,
@@ -101,7 +103,7 @@ export async function POST(req: Request) {
   await db.delete(links).where(eq(links.profileId, profile.id));
   if (linksData.length > 0) {
     await db.insert(links).values(
-      linksData.map((l: { id: string; title: string; description: string; url: string; icon: string; type?: string }, i: number) => ({
+      linksData.map((l: { id: string; title: string; description: string; url: string; icon: string; type?: string; startsAt?: string | null; endsAt?: string | null }, i: number) => ({
         id: l.id,
         profileId: profile!.id,
         title: l.title,
@@ -110,6 +112,8 @@ export async function POST(req: Request) {
         icon: l.type === "header" ? "" : (l.icon || "globe"),
         position: i,
         type: l.type || "link",
+        startsAt: l.startsAt ? new Date(l.startsAt) : null,
+        endsAt: l.endsAt ? new Date(l.endsAt) : null,
       }))
     );
   }

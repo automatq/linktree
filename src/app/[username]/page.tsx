@@ -34,6 +34,15 @@ export default async function ProfilePage({
     db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
   ]);
 
+  // Filter links by schedule (headers always shown)
+  const now = new Date();
+  const visibleLinks = userLinks.filter((link) => {
+    if (link.type === "header") return true;
+    if (link.startsAt && now < link.startsAt) return false;
+    if (link.endsAt && now > link.endsAt) return false;
+    return true;
+  });
+
   // Track view after response is sent — no latency impact
   after(async () => {
     await db.insert(profileViews).values({ profileId: profile.id }).catch(() => {});
@@ -119,7 +128,7 @@ export default async function ProfilePage({
         <div className="mb-6 h-px w-full bg-black/5 dark:bg-white/5" />
 
         <section className="w-full flex flex-col gap-2.5">
-          {userLinks.map((link, i) =>
+          {visibleLinks.map((link, i) =>
             link.type === "header" ? (
               <div key={link.id} className="animate-fade-in-up pt-3 pb-0.5 flex items-center gap-3" style={{ animationDelay: `${i * 60}ms` }}>
                 <span className="text-[10px] font-semibold uppercase tracking-widest text-black/30 dark:text-white/30 shrink-0">
@@ -128,7 +137,7 @@ export default async function ProfilePage({
                 <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
               </div>
             ) : (
-              <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link" }} index={i} cardStyle={cardStyle} cardSize={cardSize} accentColor={accentColor} />
+              <LinkCard key={link.id} link={{ ...link, type: (link.type as "link" | "header") ?? "link", startsAt: undefined, endsAt: undefined }} index={i} cardStyle={cardStyle} cardSize={cardSize} accentColor={accentColor} />
             )
           )}
         </section>
