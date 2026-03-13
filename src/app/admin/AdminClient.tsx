@@ -64,6 +64,11 @@ export function AdminClient() {
   const [gallerySaving, setGallerySaving] = useState(false);
   const [gallerySaved, setGallerySaved] = useState(false);
   const [galleryUploading, setGalleryUploading] = useState(false);
+  const [contactFormEnabled, setContactFormEnabled] = useState(false);
+  const [contactFormTitle, setContactFormTitle] = useState("Get in touch");
+  const [contactFormEmail, setContactFormEmail] = useState("");
+  const [contactFormSaving, setContactFormSaving] = useState(false);
+  const [contactFormSaved, setContactFormSaved] = useState(false);
   const { signOut } = useClerk();
 
   const checkDomainStatus = useCallback(async (domain: string) => {
@@ -103,6 +108,9 @@ export function AdminClient() {
       if (d.profile?.heroSubtitle) setHeroSubtitle(d.profile.heroSubtitle);
       if (d.profile?.heroCtaText) setHeroCtaText(d.profile.heroCtaText);
       if (d.profile?.heroCtaUrl) setHeroCtaUrl(d.profile.heroCtaUrl);
+      setContactFormEnabled(d.profile?.contactFormEnabled ?? false);
+      if (d.profile?.contactFormTitle) setContactFormTitle(d.profile.contactFormTitle);
+      if (d.profile?.contactFormEmail) setContactFormEmail(d.profile.contactFormEmail);
       setGalleryEnabled(d.profile?.galleryEnabled ?? false);
       if (d.profile?.galleryTitle) setGalleryTitle(d.profile.galleryTitle);
       if (d.profile?.galleryColumns) setGalleryColumns(d.profile.galleryColumns);
@@ -738,6 +746,75 @@ export function AdminClient() {
                     onDelete={() => deleteSocial(social.platform)}
                   />
                 ))}
+              </div>
+            </Section>
+
+            {/* Contact Form section */}
+            <Section
+              title="Contact Form"
+              action={
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs transition-all duration-300 ${contactFormSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+                  <button
+                    onClick={async () => {
+                      setContactFormSaving(true);
+                      await fetch("/api/admin/contact-form", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ contactFormEnabled, contactFormTitle, contactFormEmail }),
+                      });
+                      setContactFormSaving(false);
+                      setContactFormSaved(true);
+                      setTimeout(() => setContactFormSaved(false), 2000);
+                    }}
+                    disabled={contactFormSaving}
+                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                  >
+                    {contactFormSaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Show contact form</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Let visitors send you a message directly from your profile</p>
+                  </div>
+                  <button
+                    onClick={() => setContactFormEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${contactFormEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${contactFormEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {contactFormEnabled && (
+                  <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Widget title</label>
+                      <input
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                        value={contactFormTitle}
+                        onChange={(e) => setContactFormTitle(e.target.value)}
+                        placeholder="Get in touch"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Send messages to (email)</label>
+                      <input
+                        type="email"
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                        value={contactFormEmail}
+                        onChange={(e) => setContactFormEmail(e.target.value)}
+                        placeholder="you@example.com"
+                      />
+                    </div>
+                    {!contactFormEmail.trim() && (
+                      <p className="text-xs text-amber-500">Add your email address to receive messages.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </Section>
 
@@ -1898,22 +1975,74 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">File URL</label>
-                    <input
-                      className={inputClass + " w-full"}
-                      value={p.fileUrl}
-                      onChange={(e) => updateProd(p.id, "fileUrl", e.target.value)}
-                      placeholder="https://... (paste Blob URL)"
-                    />
+                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Digital file</label>
+                    <div className="flex gap-1.5 items-center">
+                      <input
+                        className={inputClass + " w-full min-w-0"}
+                        value={p.fileUrl}
+                        onChange={(e) => updateProd(p.id, "fileUrl", e.target.value)}
+                        placeholder={p.fileUrl ? undefined : "No file uploaded"}
+                        readOnly={!!p.fileUrl}
+                      />
+                      <label className="shrink-0 flex h-8 items-center gap-1 rounded-md border border-black/10 dark:border-white/10 px-2 text-[11px] text-black/50 dark:text-white/50 cursor-pointer hover:border-black/25 dark:hover:border-white/25 hover:text-black dark:hover:text-white transition-colors">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        {p.fileUrl ? "Replace" : "Upload"}
+                        <input
+                          type="file"
+                          className="sr-only"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            updateProd(p.id, "fileUrl", "uploading...");
+                            const form = new FormData();
+                            form.append("file", file);
+                            form.append("purpose", "product-file");
+                            const res = await fetch("/api/upload", { method: "POST", body: form });
+                            const { url } = await res.json();
+                            updateProd(p.id, "fileUrl", url);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                    </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Cover image URL</label>
-                    <input
-                      className={inputClass + " w-full"}
-                      value={p.coverUrl}
-                      onChange={(e) => updateProd(p.id, "coverUrl", e.target.value)}
-                      placeholder="https://... (optional)"
-                    />
+                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Cover image</label>
+                    <div className="flex gap-1.5 items-center">
+                      {p.coverUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={p.coverUrl} alt="" className="h-8 w-8 rounded object-cover shrink-0 border border-black/8 dark:border-white/8" />
+                      )}
+                      <label className="shrink-0 flex h-8 items-center gap-1 rounded-md border border-black/10 dark:border-white/10 px-2 text-[11px] text-black/50 dark:text-white/50 cursor-pointer hover:border-black/25 dark:hover:border-white/25 hover:text-black dark:hover:text-white transition-colors">
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        {p.coverUrl ? "Replace" : "Upload"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="sr-only"
+                          onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            updateProd(p.id, "coverUrl", "uploading...");
+                            const form = new FormData();
+                            form.append("file", file);
+                            form.append("purpose", "product-cover");
+                            const res = await fetch("/api/upload", { method: "POST", body: form });
+                            const { url } = await res.json();
+                            updateProd(p.id, "coverUrl", url);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      {p.coverUrl && (
+                        <button
+                          onClick={() => updateProd(p.id, "coverUrl", "")}
+                          className="text-[10px] text-black/25 dark:text-white/25 hover:text-red-400 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

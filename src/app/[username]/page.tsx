@@ -21,6 +21,7 @@ import { BookingClient } from "@/app/book/[username]/BookingClient";
 import { CountdownCard } from "@/components/CountdownCard";
 import { HeroCard } from "@/components/HeroCard";
 import { MediaGallery } from "@/components/MediaGallery";
+import { ContactFormWidget } from "@/components/ContactFormWidget";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
@@ -324,6 +325,17 @@ export default async function ProfilePage({
               username={profile.username}
               title={profile.tipJarTitle || "Support my work"}
               amounts={profile.tipJarAmounts || "3,5,10,25"}
+              accentColor={accentColor}
+            />
+          </section>
+        )}
+
+        {/* Contact form */}
+        {profile.contactFormEnabled && profile.contactFormEmail && (
+          <section className="w-full mt-4">
+            <ContactFormWidget
+              username={profile.username}
+              title={profile.contactFormTitle || "Get in touch"}
               accentColor={accentColor}
             />
           </section>

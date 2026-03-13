@@ -55,6 +55,9 @@ export type Profile = {
   heroSubtitle?: string;
   heroCtaText?: string;
   heroCtaUrl?: string;
+  contactFormEnabled?: boolean;
+  contactFormTitle?: string;
+  contactFormEmail?: string;
   galleryEnabled?: boolean;
   galleryTitle?: string;
   galleryColumns?: number;

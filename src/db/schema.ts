@@ -50,6 +50,10 @@ export const profiles = pgTable("profiles", {
   heroSubtitle: text("hero_subtitle").notNull().default(""),
   heroCtaText: text("hero_cta_text").notNull().default(""),
   heroCtaUrl: text("hero_cta_url").notNull().default(""),
+  // Contact form
+  contactFormEnabled: boolean("contact_form_enabled").notNull().default(false),
+  contactFormTitle: text("contact_form_title").notNull().default("Get in touch"),
+  contactFormEmail: text("contact_form_email").notNull().default(""),
   // Media gallery
   galleryEnabled: boolean("gallery_enabled").notNull().default(false),
   galleryTitle: text("gallery_title").notNull().default("Gallery"),
