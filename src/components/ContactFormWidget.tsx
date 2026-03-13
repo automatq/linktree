@@ -47,8 +47,6 @@ export function ContactFormWidget({
     }
   }
 
-  const accent = accentColor || undefined;
-
   if (sent) {
     return (
       <div className="rounded-xl border border-black/8 dark:border-white/8 p-6 text-center">
@@ -108,8 +106,8 @@ export function ContactFormWidget({
         <button
           type="submit"
           disabled={sending || !name.trim() || !email.trim() || !message.trim()}
-          className={`h-9 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ${accent ? "" : "bg-black dark:bg-white text-white dark:text-black"}`}
-          style={accent ? { backgroundColor: accent, color: "#fff" } : undefined}
+          className={`h-9 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ${accentColor ? "" : "bg-black dark:bg-white text-white dark:text-black"}`}
+          style={accentColor ? { backgroundColor: accentColor, color: "#fff" } : undefined}
         >
           {sending ? "Sending…" : "Send message"}
         </button>

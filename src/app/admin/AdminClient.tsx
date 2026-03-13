@@ -1788,8 +1788,6 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
     });
   }, []);
 
-  function genId() { return Math.random().toString(36).slice(2, 9); }
-
   function addProduct() {
     setProds((prev) => [...prev, {
       id: genId(), title: "New Product", description: "", price: 9.99,
@@ -2323,7 +2321,7 @@ function AnalyticsTab({ links }: { links: Link[] }) {
             <div className="flex flex-col gap-3">
               {(["mobile", "desktop", "tablet"] as const).map((type) => {
                 const count = deviceMap[type] ?? 0;
-                const pct = Math.round((count / totalDevices) * 100);
+                const pct = Math.min(Math.round((count / totalDevices) * 100), 100);
                 const icons = {
                   mobile: <path d="M12 18h.01M8 21h8a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z" />,
                   desktop: <><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4" /></>,
@@ -3169,12 +3167,16 @@ function AvatarUpload({
     const previewUrl = URL.createObjectURL(file);
     setPreview(previewUrl);
 
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch("/api/upload", { method: "POST", body: form });
-    const { url } = await res.json();
-    onUploaded(url);
-    setUploading(false);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: form });
+      const { url } = await res.json();
+      onUploaded(url);
+    } finally {
+      URL.revokeObjectURL(previewUrl);
+      setUploading(false);
+    }
   }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {

@@ -32,8 +32,6 @@ export function CountdownCard({
     return () => clearInterval(id);
   }, [endDateStr]);
 
-  const accent = accentColor || undefined;
-
   const parts = timeLeft
     ? [
         ...(timeLeft.days > 0 ? [{ value: timeLeft.days, label: "days" }] : []),
@@ -46,7 +44,7 @@ export function CountdownCard({
   return (
     <div
       className="w-full rounded-xl border border-black/8 dark:border-white/8 p-5 flex flex-col items-center gap-3 text-center"
-      style={accent ? { borderColor: `${accent}40` } : undefined}
+      style={accentColor ? { borderColor: `${accentColor}40` } : undefined}
     >
       {title && (
         <p className="text-sm font-semibold text-black dark:text-white">{title}</p>
@@ -57,7 +55,7 @@ export function CountdownCard({
             <div key={label} className="flex flex-col items-center gap-1">
               <span
                 className="text-3xl font-bold tabular-nums leading-none text-black dark:text-white"
-                style={accent ? { color: accent } : undefined}
+                style={accentColor ? { color: accentColor } : undefined}
               >
                 {String(value).padStart(2, "0")}
               </span>

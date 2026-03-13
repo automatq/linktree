@@ -38,7 +38,7 @@ export async function sendGuestConfirmationSms(data: SmsBookingData) {
     from: FROM,
     to: data.guestPhone,
     body: `✅ Confirmed: "${data.title}" with ${data.hostName}\n📅 ${formatShort(data.startsAt, data.guestTimezone)}\n\nSee you then!`,
-  }).catch(() => {});
+  }).catch((err) => console.error("SMS send failed:", err));
 }
 
 export async function sendHostNotificationSms(data: SmsBookingData) {
@@ -49,7 +49,7 @@ export async function sendHostNotificationSms(data: SmsBookingData) {
     from: FROM,
     to: data.hostSmsNumber,
     body: `📅 New booking: ${data.guestName} booked "${data.title}"\n${formatShort(data.startsAt, data.hostTimezone)}`,
-  }).catch(() => {});
+  }).catch((err) => console.error("SMS send failed:", err));
 }
 
 export async function sendGuestReminderSms(data: SmsBookingData, label: string) {
@@ -60,7 +60,7 @@ export async function sendGuestReminderSms(data: SmsBookingData, label: string) 
     from: FROM,
     to: data.guestPhone,
     body: `🔔 Reminder: "${data.title}" with ${data.hostName} is ${label}\n📅 ${formatShort(data.startsAt, data.guestTimezone)}`,
-  }).catch(() => {});
+  }).catch((err) => console.error("SMS send failed:", err));
 }
 
 export async function sendContactFormSms(to: string, senderName: string, senderEmail: string, message: string) {
@@ -87,5 +87,5 @@ export async function sendHostReminderSms(data: SmsBookingData, label: string) {
     from: FROM,
     to: data.hostSmsNumber,
     body: `🔔 Reminder: ${data.guestName} — "${data.title}" is ${label}\n📅 ${formatShort(data.startsAt, data.hostTimezone)}`,
-  }).catch(() => {});
+  }).catch((err) => console.error("SMS send failed:", err));
 }

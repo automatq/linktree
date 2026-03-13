@@ -73,7 +73,7 @@ export async function sendGuestConfirmation(data: BookingEmailData) {
         <p style="color:#888;font-size:13px">If you need to cancel, please reach out to ${data.hostEmail}.</p>
       </div>
     `,
-  }).catch(() => {});
+  }).catch((err) => console.error("Email send failed:", err));
 }
 
 export async function sendHostNotification(data: BookingEmailData) {
@@ -106,7 +106,7 @@ export async function sendHostNotification(data: BookingEmailData) {
         </div>
       </div>
     `,
-  }).catch(() => {});
+  }).catch((err) => console.error("Email send failed:", err));
 }
 
 export async function sendGuestReminder(data: BookingEmailData, scheduledAt: Date) {
@@ -136,5 +136,5 @@ export async function sendGuestReminder(data: BookingEmailData, scheduledAt: Dat
         </div>
       </div>
     `,
-  } as Parameters<typeof resend.emails.send>[0]).catch(() => {});
+  } as Parameters<typeof resend.emails.send>[0]).catch((err) => console.error("Email send failed:", err));
 }
