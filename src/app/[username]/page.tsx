@@ -165,17 +165,17 @@ export default async function ProfilePage({
         }}
       />
 
-      <div className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] flex items-center gap-2">
+      <div className="fixed top-[max(1rem,env(safe-area-inset-top))] right-[max(1rem,env(safe-area-inset-right))] flex items-center gap-1.5 sm:gap-2 z-20">
         {isOwner && (
           <Link
             href="/admin"
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/10 dark:border-white/10 px-3 text-xs font-medium text-black/50 dark:text-white/50 hover:border-black/25 hover:text-black dark:hover:border-white/25 dark:hover:text-white transition-colors"
+            className="flex h-8 items-center gap-1.5 rounded-lg border border-black/10 dark:border-white/10 px-2 sm:px-3 text-xs font-medium text-black/50 dark:text-white/50 hover:border-black/25 hover:text-black dark:hover:border-white/25 dark:hover:text-white transition-colors"
           >
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
             </svg>
-            Edit profile
+            <span className="hidden sm:inline">Edit profile</span>
           </Link>
         )}
         <CopyLinkButton />

@@ -293,46 +293,50 @@ export function AdminClient() {
 
       {/* Header */}
       <header className="relative border-b border-black/8 dark:border-white/8 bg-white/80 dark:bg-black/80 backdrop-blur-sm sticky top-0 z-10">
-        <div className="mx-auto flex max-w-2xl items-center justify-between px-4 h-12">
-          <div className="flex items-center gap-4">
-            {username && (
-              <>
-                <a href={`/${username}`} target="_blank" className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors">
-                  ← Live page
-                </a>
-                <button
-                  onClick={() => setShowQR(true)}
-                  className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors"
-                >
-                  QR
-                </button>
-              </>
-            )}
-            <nav className="flex gap-1">
-              {(["content", "analytics", "booking", "store"] as const).map((t) => (
-                <button
-                  key={t}
-                  onClick={() => setTab(t)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
-                    tab === t
-                      ? "bg-black/8 dark:bg-white/8 text-black dark:text-white"
-                      : "text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70"
-                  }`}
-                >
-                  {t}
-                </button>
-              ))}
-            </nav>
+        <div className="mx-auto max-w-2xl px-4">
+          {/* Top row: links + actions */}
+          <div className="flex items-center justify-between h-11">
+            <div className="flex items-center gap-3">
+              {username && (
+                <>
+                  <a href={`/${username}`} target="_blank" className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors">
+                    ← Live page
+                  </a>
+                  <button
+                    onClick={() => setShowQR(true)}
+                    className="text-xs text-black/30 dark:text-white/30 hover:text-black/60 dark:hover:text-white/60 transition-colors"
+                  >
+                    QR
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => signOut({ redirectUrl: "/" })}
+                className="flex h-7 items-center rounded-md border border-black/10 dark:border-white/10 px-3 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+              >
+                Sign out
+              </button>
+              <ThemeToggle />
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => signOut({ redirectUrl: "/" })}
-              className="flex h-7 items-center rounded-md border border-black/10 dark:border-white/10 px-3 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-            >
-              Sign out
-            </button>
-            <ThemeToggle />
-          </div>
+          {/* Bottom row: tab nav */}
+          <nav className="flex gap-1 pb-2 -mx-1 overflow-x-auto scrollbar-none">
+            {(["content", "analytics", "booking", "store"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`shrink-0 px-3 py-1 rounded-md text-xs font-medium capitalize transition-colors ${
+                  tab === t
+                    ? "bg-black/8 dark:bg-white/8 text-black dark:text-white"
+                    : "text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70"
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </nav>
         </div>
       </header>
 
