@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { profiles, subscribers } from "@/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 
 export async function GET() {
   const { userId } = await auth();
@@ -31,6 +31,6 @@ export async function DELETE(req: Request) {
   const profile = await db.query.profiles.findFirst({ where: eq(profiles.userId, userId) });
   if (!profile) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  await db.delete(subscribers).where(eq(subscribers.id, id));
+  await db.delete(subscribers).where(and(eq(subscribers.id, id), eq(subscribers.profileId, profile.id)));
   return NextResponse.json({ ok: true });
 }

@@ -25,7 +25,46 @@ import { ContactFormWidget } from "@/components/ContactFormWidget";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
+import type { Metadata } from "next";
+
 export const dynamic = "force-dynamic";
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ username: string }>;
+}): Promise<Metadata> {
+  const { username } = await params;
+  const profile = await db.query.profiles.findFirst({
+    where: eq(profiles.username, username.toLowerCase()),
+  });
+
+  if (!profile) {
+    return { title: "Not Found" };
+  }
+
+  const title = profile.name ? `${profile.name} (@${profile.username})` : `@${profile.username}`;
+  const description = profile.bio || `Check out ${profile.name || profile.username}'s links on TriLink`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://trilink.app";
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `${appUrl}/${profile.username}`,
+      type: "profile",
+      ...(profile.avatarUrl ? { images: [{ url: profile.avatarUrl, width: 400, height: 400 }] } : {}),
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      ...(profile.avatarUrl ? { images: [profile.avatarUrl] } : {}),
+    },
+  };
+}
 
 export default async function ProfilePage({
   params,

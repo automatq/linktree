@@ -79,8 +79,17 @@ function TweetEmbed({ url }: { url: string }) {
 
   useEffect(() => {
     if (!ref.current) return;
+    // Validate URL is a real Twitter/X status URL before embedding
+    if (!/^https?:\/\/(?:twitter\.com|x\.com)\/[a-zA-Z0-9_]+\/status\/\d+/.test(url)) return;
     const dark = document.documentElement.classList.contains("dark");
-    ref.current.innerHTML = `<blockquote class="twitter-tweet" data-theme="${dark ? "dark" : "light"}"><a href="${url}"></a></blockquote>`;
+    ref.current.textContent = "";
+    const blockquote = document.createElement("blockquote");
+    blockquote.className = "twitter-tweet";
+    blockquote.dataset.theme = dark ? "dark" : "light";
+    const a = document.createElement("a");
+    a.href = url;
+    blockquote.appendChild(a);
+    ref.current.appendChild(blockquote);
 
     const twttr = (window as unknown as Record<string, unknown>).twttr as { widgets?: { load: (el: HTMLElement) => void } } | undefined;
     if (twttr?.widgets) {

@@ -5,7 +5,7 @@ import { profiles, products } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 
 function genId() {
-  return Math.random().toString(36).slice(2, 11) + Math.random().toString(36).slice(2, 11);
+  return crypto.randomUUID();
 }
 
 export async function GET() {

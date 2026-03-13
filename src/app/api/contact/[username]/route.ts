@@ -36,7 +36,17 @@ export async function POST(
   const trimmedName = name.trim();
   const trimmedEmail = email.trim();
   const trimmedMessage = message.trim();
-  const escapedMessage = trimmedMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // Validate email format
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    return NextResponse.json({ error: "Invalid email address" }, { status: 400 });
+  }
+
+  // Escape all user input for HTML email
+  const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const escapedName = esc(trimmedName);
+  const escapedEmail = esc(trimmedEmail);
+  const escapedMessage = esc(trimmedMessage);
 
   // Send email + SMS in parallel, awaited to ensure delivery
   const promises: Promise<unknown>[] = [];
@@ -56,8 +66,8 @@ export async function POST(
             <div style="background:#f9f9f9;border-radius:8px;padding:20px;margin-bottom:24px">
               <div style="margin-bottom:12px">
                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">From</div>
-                <div style="font-weight:600">${trimmedName}</div>
-                <div style="color:#555;font-size:14px">${trimmedEmail}</div>
+                <div style="font-weight:600">${escapedName}</div>
+                <div style="color:#555;font-size:14px">${escapedEmail}</div>
               </div>
               <div>
                 <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">Message</div>
@@ -65,7 +75,7 @@ export async function POST(
               </div>
             </div>
 
-            <p style="color:#888;font-size:13px">You can reply directly to this email to respond to ${trimmedName}.</p>
+            <p style="color:#888;font-size:13px">You can reply directly to this email to respond to ${escapedName}.</p>
           </div>
         `,
       }).catch((err) => console.error("Contact email failed:", err))

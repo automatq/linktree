@@ -5,7 +5,7 @@ import { profiles, trackedLinks, trackedLinkClicks } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 function genCode() {
-  return Math.random().toString(36).slice(2, 9);
+  return crypto.randomUUID().replace(/-/g, "").slice(0, 8);
 }
 
 export async function GET() {
