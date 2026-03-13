@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { profiles, subscribers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { fireWebhook } from "@/lib/webhook";
+import { isRateLimited } from "@/lib/rate-limit";
 
 function genId() {
   return crypto.randomUUID();
@@ -13,6 +14,13 @@ export async function POST(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+
+  // Rate limit: 10 subscribe attempts per IP per 15 minutes
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(`subscribe:${ip}`, 10, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { email, name } = await req.json();
 
   if (!email || !email.includes("@")) {

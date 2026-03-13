@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { sendContactFormSms } from "@/lib/sms";
+import { isRateLimited } from "@/lib/rate-limit";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -12,6 +13,12 @@ export async function POST(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+
+  // Rate limit: 5 contact submissions per IP per 15 minutes
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(`contact:${ip}`, 5, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+  }
 
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.username, username.toLowerCase()),

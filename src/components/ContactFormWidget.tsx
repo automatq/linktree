@@ -52,10 +52,16 @@ export function ContactFormWidget({
   if (sent) {
     return (
       <div className="rounded-xl border border-black/8 dark:border-white/8 p-6 text-center">
-        <div className="mb-2 text-lg">Message sent</div>
-        <p className="text-xs text-black/40 dark:text-white/40">
+        <div className="mb-2 text-lg text-black dark:text-white">Message sent</div>
+        <p className="text-xs text-black/40 dark:text-white/40 mb-3">
           Thanks for reaching out. You should hear back soon.
         </p>
+        <button
+          onClick={() => { setSent(false); setName(""); setEmail(""); setMessage(""); setError(""); }}
+          className="text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white underline transition-colors"
+        >
+          Send another message
+        </button>
       </div>
     );
   }

@@ -75,7 +75,9 @@ export const links = pgTable("links", {
   type: text("type").notNull().default("link"),
   startsAt: timestamp("starts_at"),
   endsAt: timestamp("ends_at"),
-});
+}, (t) => [
+  index("links_profile_id_idx").on(t.profileId),
+]);
 
 export const socialLinks = pgTable("social_links", {
   id: serial("id").primaryKey(),
@@ -103,7 +105,9 @@ export const profileViews = pgTable("profile_views", {
   referrer: text("referrer").notNull().default(""),
   device: text("device").notNull().default(""),
   country: text("country").notNull().default(""),
-});
+}, (t) => [
+  index("profile_views_profile_id_idx").on(t.profileId),
+]);
 
 // Trackable links (named short links for external use)
 export const trackedLinks = pgTable("tracked_links", {
@@ -157,7 +161,9 @@ export const products = pgTable("products", {
   active: boolean("active").notNull().default(true),
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("products_profile_id_idx").on(t.profileId),
+]);
 
 // Orders (digital product purchases via Stripe)
 export const orders = pgTable("orders", {
@@ -178,7 +184,10 @@ export const subscribers = pgTable("subscribers", {
   email: text("email").notNull(),
   name: text("name").notNull().default(""),
   subscribedAt: timestamp("subscribed_at").defaultNow(),
-});
+}, (t) => [
+  index("subscribers_profile_id_idx").on(t.profileId),
+  index("subscribers_profile_email_idx").on(t.profileId, t.email),
+]);
 
 // Individual bookings
 export const bookings = pgTable("bookings", {
@@ -195,4 +204,7 @@ export const bookings = pgTable("bookings", {
   smsReminder24hSent: boolean("sms_reminder_24h_sent").notNull().default(false),
   smsReminder1hSent: boolean("sms_reminder_1h_sent").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("bookings_profile_id_idx").on(t.profileId),
+  index("bookings_profile_status_idx").on(t.profileId, t.status),
+]);

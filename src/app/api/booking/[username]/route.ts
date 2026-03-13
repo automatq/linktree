@@ -6,6 +6,7 @@ import { generateSlots } from "@/lib/slots";
 import { sendGuestConfirmation, sendHostNotification, sendGuestReminder } from "@/lib/email";
 import { sendGuestConfirmationSms, sendHostNotificationSms } from "@/lib/sms";
 import { fireWebhook } from "@/lib/webhook";
+import { isRateLimited } from "@/lib/rate-limit";
 
 function genId() {
   return crypto.randomUUID();
@@ -16,6 +17,13 @@ export async function POST(
   { params }: { params: Promise<{ username: string }> }
 ) {
   const { username } = await params;
+
+  // Rate limit: 5 booking attempts per IP per 15 minutes
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(`booking:${ip}`, 5, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const body = await req.json();
   const { slotISO, guestName, guestEmail, notes, guestTimezone, guestPhone } = body;
 

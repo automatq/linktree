@@ -36,6 +36,7 @@ export function AdminClient() {
   const [domainStatus, setDomainStatus] = useState<"idle" | "checking" | "active" | "pending" | "error">("idle");
   const [domainStatusMsg, setDomainStatusMsg] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store">("content");
   const [showQR, setShowQR] = useState(false);
   const [metaPixelId, setMetaPixelId] = useState("");
@@ -121,6 +122,8 @@ export function AdminClient() {
       fetch("/api/admin/gallery").then((r) => r.json()).then((g) => {
         if (g.images) setGalleryImages(g.images);
       });
+    }).catch(() => {
+      setLoadError(true);
     });
   }, [checkDomainStatus]);
 
@@ -141,8 +144,20 @@ export function AdminClient() {
 
   if (!data) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
-        <span className="text-xs text-black/30 dark:text-white/30">Loading…</span>
+      <div className="min-h-screen bg-white dark:bg-black flex flex-col items-center justify-center gap-3">
+        {loadError ? (
+          <>
+            <span className="text-sm text-red-500">Failed to load data</span>
+            <button
+              onClick={() => { setLoadError(false); window.location.reload(); }}
+              className="text-xs text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white underline transition-colors"
+            >
+              Try again
+            </button>
+          </>
+        ) : (
+          <span className="text-sm text-black/50 dark:text-white/50">Loading…</span>
+        )}
       </div>
     );
   }
@@ -934,28 +949,32 @@ export function AdminClient() {
                             const files = e.target.files;
                             if (!files || files.length === 0) return;
                             setGalleryUploading(true);
+                            let failed = 0;
                             for (const file of Array.from(files)) {
-                              const form = new FormData();
-                              form.append("file", file);
-                              form.append("purpose", "gallery");
-                              const res = await fetch("/api/upload", { method: "POST", body: form });
-                              const { url } = await res.json();
-                              const newImg = {
-                                id: Math.random().toString(36).slice(2, 9),
-                                imageUrl: url,
-                                caption: "",
-                                linkUrl: "",
-                                position: galleryImages.length,
-                              };
-                              setGalleryImages((prev) => [...prev, newImg]);
-                              // Persist immediately
-                              await fetch("/api/admin/gallery", {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({ action: "add", image: newImg }),
-                              });
+                              try {
+                                const form = new FormData();
+                                form.append("file", file);
+                                form.append("purpose", "gallery");
+                                const res = await fetch("/api/upload", { method: "POST", body: form });
+                                if (!res.ok) { failed++; continue; }
+                                const { url } = await res.json();
+                                const newImg = {
+                                  id: Math.random().toString(36).slice(2, 9),
+                                  imageUrl: url,
+                                  caption: "",
+                                  linkUrl: "",
+                                  position: galleryImages.length,
+                                };
+                                setGalleryImages((prev) => [...prev, newImg]);
+                                await fetch("/api/admin/gallery", {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({ action: "add", image: newImg }),
+                                });
+                              } catch { failed++; }
                             }
                             setGalleryUploading(false);
+                            if (failed > 0) alert(`${failed} image${failed > 1 ? "s" : ""} failed to upload`);
                             e.target.value = "";
                           }}
                         />
