@@ -59,10 +59,19 @@ export const profiles = pgTable("profiles", {
   galleryEnabled: boolean("gallery_enabled").notNull().default(false),
   galleryTitle: text("gallery_title").notNull().default("Gallery"),
   galleryColumns: integer("gallery_columns").notNull().default(3),
+  usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("profiles_custom_domain_idx").on(t.customDomain),
 ]);
+
+// Previous usernames — enables redirect from old URLs
+export const previousUsernames = pgTable("previous_usernames", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  username: text("username").notNull().unique(),
+  changedAt: timestamp("changed_at").defaultNow(),
+});
 
 export const links = pgTable("links", {
   id: text("id").primaryKey(),

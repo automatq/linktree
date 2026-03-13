@@ -124,7 +124,6 @@ export async function POST(req: Request) {
   } else {
     const [updated] = await db.update(profiles)
       .set({
-        username: profileData.username?.toLowerCase().replace(/[^a-z0-9_-]/g, "") || profile.username,
         name: profileData.name,
         bio: profileData.bio,
         avatarInitials: profileData.avatarInitials,

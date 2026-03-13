@@ -1,11 +1,11 @@
 import React from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { after } from "next/server";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db";
-import { profiles, links, socialLinks, profileViews, products, galleryImages } from "@/db/schema";
+import { profiles, links, socialLinks, profileViews, products, galleryImages, previousUsernames } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
@@ -40,6 +40,18 @@ export async function generateMetadata({
   });
 
   if (!profile) {
+    // Check if this is an old username that should redirect
+    const prev = await db.query.previousUsernames.findFirst({
+      where: eq(previousUsernames.username, username.toLowerCase()),
+    });
+    if (prev) {
+      const newProfile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, prev.profileId),
+      });
+      if (newProfile) {
+        return { title: `Redirecting to @${newProfile.username}` };
+      }
+    }
     return { title: "Not Found" };
   }
 
@@ -78,7 +90,24 @@ export default async function ProfilePage({
     where: eq(profiles.username, username.toLowerCase()),
   });
 
-  if (!profile) notFound();
+  if (!profile) {
+    // Check for old username redirect
+    const prev = await db.query.previousUsernames.findFirst({
+      where: eq(previousUsernames.username, username.toLowerCase()),
+    });
+    if (prev) {
+      // Expired after 30 days — release the username
+      if (prev.changedAt && Date.now() - prev.changedAt.getTime() > 30 * 24 * 60 * 60 * 1000) {
+        await db.delete(previousUsernames).where(eq(previousUsernames.id, prev.id));
+      } else {
+        const newProfile = await db.query.profiles.findFirst({
+          where: eq(profiles.id, prev.profileId),
+        });
+        if (newProfile) redirect(`/${newProfile.username}`);
+      }
+    }
+    notFound();
+  }
 
   const isOwner = userId === profile.userId;
 

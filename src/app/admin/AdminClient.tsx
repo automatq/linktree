@@ -71,6 +71,7 @@ export function AdminClient() {
   const [contactFormSmsNumber, setContactFormSmsNumber] = useState("");
   const [contactFormSaving, setContactFormSaving] = useState(false);
   const [contactFormSaved, setContactFormSaved] = useState(false);
+  const [showUsernameChange, setShowUsernameChange] = useState(false);
   const { signOut } = useClerk();
 
   const checkDomainStatus = useCallback(async (domain: string) => {
@@ -387,7 +388,18 @@ export function AdminClient() {
                       <Input value={data.profile.name} onChange={(v) => updateProfile("name", v)} />
                     </Field>
                     <Field label="Username">
-                      <Input value={data.profile.username} onChange={(v) => updateProfile("username", v)} />
+                      <div className="flex items-center gap-2">
+                        <span className="flex-1 h-9 flex items-center px-3 rounded-lg border border-black/10 dark:border-white/10 text-xs text-black dark:text-white bg-black/[0.02] dark:bg-white/[0.02]">
+                          @{data.profile.username}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setShowUsernameChange(true)}
+                          className="shrink-0 h-9 px-3 rounded-lg border border-black/10 dark:border-white/10 text-xs text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
+                        >
+                          Change
+                        </button>
+                      </div>
                     </Field>
                     <Field label="Avatar Initials">
                       <Input value={data.profile.avatarInitials} onChange={(v) => updateProfile("avatarInitials", v)} maxLength={3} />
@@ -1371,6 +1383,19 @@ export function AdminClient() {
 
       {showQR && username && (
         <QRModal username={username} onClose={() => setShowQR(false)} />
+      )}
+
+      {showUsernameChange && data && (
+        <UsernameChangeModal
+          currentUsername={data.profile.username}
+          onClose={() => setShowUsernameChange(false)}
+          onChanged={(newUsername) => {
+            const next = { ...data, profile: { ...data.profile, username: newUsername } };
+            setData(next);
+            setUsername(newUsername);
+            setShowUsernameChange(false);
+          }}
+        />
       )}
     </div>
   );
@@ -3678,6 +3703,117 @@ function BgPicker({
           />
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Username Change Modal ────────────────────────────────────────────────────
+
+function UsernameChangeModal({
+  currentUsername,
+  onClose,
+  onChanged,
+}: {
+  currentUsername: string;
+  onClose: () => void;
+  onChanged: (newUsername: string) => void;
+}) {
+  const [value, setValue] = useState(currentUsername);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
+
+  const clean = value.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  const isValid = /^[a-z0-9_-]{3,30}$/.test(clean);
+  const isChanged = clean !== currentUsername;
+
+  async function handleSubmit() {
+    if (!isValid || !isChanged || !confirmed) return;
+    setSaving(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/admin/username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: clean }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Failed to change username");
+        setSaving(false);
+        return;
+      }
+
+      onChanged(data.username);
+    } catch {
+      setError("Something went wrong");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl w-full max-w-md p-6 flex flex-col gap-4" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-base font-bold text-black dark:text-white">Change username</h3>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-black/60 dark:text-white/60">New username</label>
+          <div className="flex items-center h-10 rounded-lg border border-black/10 dark:border-white/10 overflow-hidden">
+            <span className="px-3 text-xs text-black/30 dark:text-white/30 select-none">@</span>
+            <input
+              type="text"
+              value={value}
+              onChange={(e) => { setValue(e.target.value); setConfirmed(false); setError(""); }}
+              className="flex-1 h-full bg-transparent text-sm text-black dark:text-white outline-none pr-3"
+              maxLength={30}
+              autoFocus
+            />
+          </div>
+          {value && !isValid && (
+            <p className="text-xs text-red-500">3-30 characters: letters, numbers, hyphens, underscores</p>
+          )}
+        </div>
+
+        {isChanged && isValid && (
+          <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 p-3 flex flex-col gap-2">
+            <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">Warning</p>
+            <ul className="text-xs text-amber-700 dark:text-amber-400 flex flex-col gap-1 list-disc pl-4">
+              <li>Your current URL <strong>/{currentUsername}</strong> will redirect to <strong>/{clean}</strong> for 30 days, then become available</li>
+              <li>Shared links, QR codes, and embeds will temporarily redirect</li>
+              <li>You can only change your username once every 30 days</li>
+            </ul>
+            <label className="flex items-start gap-2 pt-1 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+                className="mt-0.5 accent-amber-600"
+              />
+              <span className="text-xs text-amber-800 dark:text-amber-300">I understand my old links will eventually stop working</span>
+            </label>
+          </div>
+        )}
+
+        {error && <p className="text-xs text-red-500">{error}</p>}
+
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 h-9 rounded-lg border border-black/10 dark:border-white/10 text-xs font-medium text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!isValid || !isChanged || !confirmed || saving}
+            className="flex-1 h-9 rounded-lg bg-black dark:bg-white text-white dark:text-black text-xs font-medium transition-all disabled:opacity-40"
+          >
+            {saving ? "Changing…" : "Change username"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
