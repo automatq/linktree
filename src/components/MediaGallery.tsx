@@ -143,7 +143,7 @@ export function MediaGallery({
           )}
 
           <div
-            className="relative max-w-3xl w-full max-h-[90vh] flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-black/90 shadow-2xl"
+            className="relative max-w-[90vw] max-h-[90vh] flex flex-col rounded-2xl overflow-hidden bg-white dark:bg-black/90 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
@@ -158,32 +158,24 @@ export function MediaGallery({
               </svg>
             </button>
 
-            {/* Media */}
+            {/* Media — uses native img/video so the box hugs the content */}
             {isVideo(lightbox.imageUrl) ? (
-              <div className="relative w-full bg-black flex items-center justify-center" style={{ maxHeight: "75vh" }}>
-                <video
-                  ref={videoRef}
-                  key={lightbox.id}
-                  src={lightbox.imageUrl}
-                  controls
-                  autoPlay
-                  playsInline
-                  className="w-full object-contain"
-                  style={{ maxHeight: "75vh" }}
-                />
-              </div>
+              <video
+                ref={videoRef}
+                key={lightbox.id}
+                src={lightbox.imageUrl}
+                controls
+                autoPlay
+                playsInline
+                className="block max-w-full max-h-[80vh] object-contain bg-black"
+              />
             ) : (
-              <div className="relative w-full" style={{ minHeight: "300px", maxHeight: "75vh" }}>
-                <Image
-                  src={lightbox.imageUrl}
-                  alt={lightbox.caption || ""}
-                  fill
-                  quality={95}
-                  className="object-contain bg-black/5 dark:bg-white/5"
-                  sizes="(max-width: 768px) 100vw, 768px"
-                  priority
-                />
-              </div>
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={lightbox.imageUrl}
+                alt={lightbox.caption || ""}
+                className="block max-w-full max-h-[80vh] object-contain bg-black/5 dark:bg-white/5"
+              />
             )}
 
             {/* Caption + Link + Counter */}
