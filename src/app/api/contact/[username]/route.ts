@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { after } from "next/server";
 import { Resend } from "resend";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
@@ -39,10 +38,12 @@ export async function POST(
   const trimmedMessage = message.trim();
   const escapedMessage = trimmedMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-  // Send email if configured (non-blocking via after())
+  // Send email + SMS in parallel, awaited to ensure delivery
+  const promises: Promise<unknown>[] = [];
+
   if (profile.contactFormEmail && process.env.RESEND_API_KEY) {
-    after(async () => {
-      await resend.emails.send({
+    promises.push(
+      resend.emails.send({
         from: "Contact Form <bookings@resend.dev>",
         to: profile.contactFormEmail,
         replyTo: trimmedEmail,
@@ -67,21 +68,22 @@ export async function POST(
             <p style="color:#888;font-size:13px">You can reply directly to this email to respond to ${trimmedName}.</p>
           </div>
         `,
-      }).catch(() => {});
-    });
+      }).catch((err) => console.error("Contact email failed:", err))
+    );
   }
 
-  // Send SMS if configured (non-blocking via after())
   if (profile.contactFormSmsNumber) {
-    after(async () => {
-      await sendContactFormSms(
+    promises.push(
+      sendContactFormSms(
         profile.contactFormSmsNumber,
         trimmedName,
         trimmedEmail,
         trimmedMessage,
-      );
-    });
+      ).catch((err) => console.error("Contact SMS failed:", err))
+    );
   }
+
+  await Promise.all(promises);
 
   return NextResponse.json({ ok: true });
 }

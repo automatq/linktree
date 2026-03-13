@@ -65,7 +65,9 @@ export async function sendGuestReminderSms(data: SmsBookingData, label: string) 
 
 export async function sendContactFormSms(to: string, senderName: string, senderEmail: string, message: string) {
   const client = getClient();
-  if (!client || !FROM || !to) return;
+  if (!client) { console.error("Contact SMS: Twilio not configured (missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN)"); return; }
+  if (!FROM) { console.error("Contact SMS: missing TWILIO_PHONE_NUMBER"); return; }
+  if (!to) { console.error("Contact SMS: no recipient number"); return; }
 
   // Truncate message to keep SMS under 320 chars
   const truncated = message.length > 200 ? message.slice(0, 197) + "..." : message;
@@ -74,7 +76,7 @@ export async function sendContactFormSms(to: string, senderName: string, senderE
     from: FROM,
     to,
     body: `💬 New message from ${senderName} (${senderEmail}):\n\n${truncated}`,
-  }).catch(() => {});
+  });
 }
 
 export async function sendHostReminderSms(data: SmsBookingData, label: string) {
