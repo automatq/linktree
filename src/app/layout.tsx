@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Inter, Playfair_Display, DM_Sans, Space_Grotesk, Lora, Outfit } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { Providers } from "./providers";
+import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -47,6 +48,12 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "TriLink",
   description: "All your links in one place",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "TriLink",
+  },
 };
 
 export const viewport: Viewport = {
@@ -70,6 +77,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <body className="antialiased">
+          <ServiceWorkerRegistrar />
           <Providers>{children}</Providers>
         </body>
       </html>
