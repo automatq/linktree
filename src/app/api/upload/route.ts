@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
 
   const ext = file.name.split(".").pop() ?? "jpg";
-  const folder = purpose === "background" ? "backgrounds" : purpose === "hero" ? "heroes" : "avatars";
+  const folder = purpose === "background" ? "backgrounds" : purpose === "hero" ? "heroes" : purpose === "gallery" ? "gallery" : "avatars";
   const blob = await put(`${folder}/${userId}-${Date.now()}.${ext}`, file, {
     access: "public",
     allowOverwrite: true,

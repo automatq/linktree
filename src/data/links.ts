@@ -55,6 +55,17 @@ export type Profile = {
   heroSubtitle?: string;
   heroCtaText?: string;
   heroCtaUrl?: string;
+  galleryEnabled?: boolean;
+  galleryTitle?: string;
+  galleryColumns?: number;
+};
+
+export type GalleryImage = {
+  id: string;
+  imageUrl: string;
+  caption: string;
+  linkUrl: string;
+  position: number;
 };
 
 export type Product = {

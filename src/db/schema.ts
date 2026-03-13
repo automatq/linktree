@@ -50,6 +50,10 @@ export const profiles = pgTable("profiles", {
   heroSubtitle: text("hero_subtitle").notNull().default(""),
   heroCtaText: text("hero_cta_text").notNull().default(""),
   heroCtaUrl: text("hero_cta_url").notNull().default(""),
+  // Media gallery
+  galleryEnabled: boolean("gallery_enabled").notNull().default(false),
+  galleryTitle: text("gallery_title").notNull().default("Gallery"),
+  galleryColumns: integer("gallery_columns").notNull().default(3),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("profiles_custom_domain_idx").on(t.customDomain),
@@ -113,6 +117,17 @@ export const trackedLinkClicks = pgTable("tracked_link_clicks", {
   referrer: text("referrer").notNull().default(""),
   device: text("device").notNull().default(""),
   country: text("country").notNull().default(""),
+});
+
+// Media gallery images
+export const galleryImages = pgTable("gallery_images", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  imageUrl: text("image_url").notNull(),
+  caption: text("caption").notNull().default(""),
+  linkUrl: text("link_url").notNull().default(""),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Weekly recurring availability windows

@@ -66,6 +66,9 @@ export async function GET() {
       heroSubtitle: profile.heroSubtitle,
       heroCtaText: profile.heroCtaText,
       heroCtaUrl: profile.heroCtaUrl,
+      galleryEnabled: profile.galleryEnabled,
+      galleryTitle: profile.galleryTitle,
+      galleryColumns: profile.galleryColumns,
     },
     links: userLinks.map((l) => ({
       id: l.id,

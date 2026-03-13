@@ -57,6 +57,13 @@ export function AdminClient() {
   const [heroSaving, setHeroSaving] = useState(false);
   const [heroSaved, setHeroSaved] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
+  const [galleryEnabled, setGalleryEnabled] = useState(false);
+  const [galleryTitle, setGalleryTitle] = useState("Gallery");
+  const [galleryColumns, setGalleryColumns] = useState(3);
+  const [galleryImages, setGalleryImages] = useState<Array<{ id: string; imageUrl: string; caption: string; linkUrl: string; position: number }>>([]);
+  const [gallerySaving, setGallerySaving] = useState(false);
+  const [gallerySaved, setGallerySaved] = useState(false);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const { signOut } = useClerk();
 
   const checkDomainStatus = useCallback(async (domain: string) => {
@@ -96,7 +103,14 @@ export function AdminClient() {
       if (d.profile?.heroSubtitle) setHeroSubtitle(d.profile.heroSubtitle);
       if (d.profile?.heroCtaText) setHeroCtaText(d.profile.heroCtaText);
       if (d.profile?.heroCtaUrl) setHeroCtaUrl(d.profile.heroCtaUrl);
+      setGalleryEnabled(d.profile?.galleryEnabled ?? false);
+      if (d.profile?.galleryTitle) setGalleryTitle(d.profile.galleryTitle);
+      if (d.profile?.galleryColumns) setGalleryColumns(d.profile.galleryColumns);
       setStats(s);
+      // Load gallery images
+      fetch("/api/admin/gallery").then((r) => r.json()).then((g) => {
+        if (g.images) setGalleryImages(g.images);
+      });
     });
   }, [checkDomainStatus]);
 
@@ -724,6 +738,212 @@ export function AdminClient() {
                     onDelete={() => deleteSocial(social.platform)}
                   />
                 ))}
+              </div>
+            </Section>
+
+            {/* Media Gallery section */}
+            <Section
+              title="Media Gallery"
+              action={
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs transition-all duration-300 ${gallerySaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+                  <button
+                    onClick={async () => {
+                      setGallerySaving(true);
+                      await Promise.all([
+                        fetch("/api/admin/gallery", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "settings", galleryEnabled, galleryTitle, galleryColumns }),
+                        }),
+                        fetch("/api/admin/gallery", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "bulk", images: galleryImages }),
+                        }),
+                      ]);
+                      setGallerySaving(false);
+                      setGallerySaved(true);
+                      setTimeout(() => setGallerySaved(false), 2000);
+                    }}
+                    disabled={gallerySaving}
+                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
+                  >
+                    {gallerySaving ? "Saving…" : "Save"}
+                  </button>
+                </div>
+              }
+            >
+              <div className="flex flex-col gap-4">
+                {/* Enable toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Show gallery</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Instagram-style photo/video grid on your profile</p>
+                  </div>
+                  <button
+                    onClick={() => setGalleryEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${galleryEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${galleryEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {galleryEnabled && (
+                  <>
+                    {/* Settings */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Section title</label>
+                        <input
+                          className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                          value={galleryTitle}
+                          onChange={(e) => setGalleryTitle(e.target.value)}
+                          placeholder="Gallery"
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Columns</label>
+                        <div className="flex items-center gap-1 rounded-lg border border-black/10 dark:border-white/10 p-0.5 text-[11px]">
+                          {[2, 3, 4].map((n) => (
+                            <button
+                              key={n}
+                              onClick={() => setGalleryColumns(n)}
+                              className={`flex-1 px-2 py-1 rounded-md text-center transition-colors ${
+                                galleryColumns === n
+                                  ? "bg-black dark:bg-white text-white dark:text-black font-medium"
+                                  : "text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white"
+                              }`}
+                            >
+                              {n}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Upload button */}
+                    <div className="flex items-center gap-2">
+                      <label className="flex h-8 items-center gap-1.5 rounded-lg border border-dashed border-black/15 dark:border-white/15 px-3 text-xs text-black/50 dark:text-white/50 cursor-pointer hover:border-black/30 dark:hover:border-white/30 hover:text-black dark:hover:text-white transition-colors">
+                        {galleryUploading ? (
+                          <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
+                        ) : (
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        )}
+                        {galleryUploading ? "Uploading…" : "Add image"}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          className="sr-only"
+                          onChange={async (e) => {
+                            const files = e.target.files;
+                            if (!files || files.length === 0) return;
+                            setGalleryUploading(true);
+                            for (const file of Array.from(files)) {
+                              const form = new FormData();
+                              form.append("file", file);
+                              form.append("purpose", "gallery");
+                              const res = await fetch("/api/upload", { method: "POST", body: form });
+                              const { url } = await res.json();
+                              const newImg = {
+                                id: Math.random().toString(36).slice(2, 9),
+                                imageUrl: url,
+                                caption: "",
+                                linkUrl: "",
+                                position: galleryImages.length,
+                              };
+                              setGalleryImages((prev) => [...prev, newImg]);
+                              // Persist immediately
+                              await fetch("/api/admin/gallery", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "add", image: newImg }),
+                              });
+                            }
+                            setGalleryUploading(false);
+                            e.target.value = "";
+                          }}
+                        />
+                      </label>
+                      <span className="text-[10px] text-black/25 dark:text-white/25">{galleryImages.length} image{galleryImages.length !== 1 ? "s" : ""}</span>
+                    </div>
+
+                    {/* Image grid with edit controls */}
+                    {galleryImages.length > 0 && (
+                      <div className="flex flex-col gap-2">
+                        {galleryImages.map((img, i) => (
+                          <div key={img.id} className="flex gap-3 items-start rounded-lg border border-black/8 dark:border-white/8 p-2">
+                            {/* Thumbnail */}
+                            <div className="w-16 h-16 rounded-md overflow-hidden shrink-0 bg-black/[0.02] dark:bg-white/[0.02]">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={img.imageUrl} alt="" className="w-full h-full object-cover" />
+                            </div>
+                            {/* Fields */}
+                            <div className="flex-1 flex flex-col gap-1.5 min-w-0">
+                              <input
+                                className="h-7 w-full rounded-md border border-black/8 dark:border-white/8 bg-transparent px-2 text-xs text-black dark:text-white outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors"
+                                value={img.caption}
+                                onChange={(e) => setGalleryImages((prev) => prev.map((x) => x.id === img.id ? { ...x, caption: e.target.value } : x))}
+                                placeholder="Caption (optional)"
+                              />
+                              <input
+                                className="h-7 w-full rounded-md border border-black/8 dark:border-white/8 bg-transparent px-2 text-xs text-black dark:text-white outline-none focus:border-black/20 dark:focus:border-white/20 transition-colors font-mono"
+                                value={img.linkUrl}
+                                onChange={(e) => setGalleryImages((prev) => prev.map((x) => x.id === img.id ? { ...x, linkUrl: e.target.value } : x))}
+                                placeholder="Link URL (optional)"
+                              />
+                            </div>
+                            {/* Actions */}
+                            <div className="flex flex-col gap-0.5 shrink-0">
+                              <button
+                                onClick={() => {
+                                  if (i === 0) return;
+                                  setGalleryImages((prev) => {
+                                    const arr = [...prev];
+                                    [arr[i - 1], arr[i]] = [arr[i], arr[i - 1]];
+                                    return arr;
+                                  });
+                                }}
+                                disabled={i === 0}
+                                className="text-black/25 dark:text-white/25 hover:text-black dark:hover:text-white disabled:opacity-20 transition-colors"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (i === galleryImages.length - 1) return;
+                                  setGalleryImages((prev) => {
+                                    const arr = [...prev];
+                                    [arr[i], arr[i + 1]] = [arr[i + 1], arr[i]];
+                                    return arr;
+                                  });
+                                }}
+                                disabled={i === galleryImages.length - 1}
+                                className="text-black/25 dark:text-white/25 hover:text-black dark:hover:text-white disabled:opacity-20 transition-colors"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                              </button>
+                              <button
+                                onClick={async () => {
+                                  setGalleryImages((prev) => prev.filter((x) => x.id !== img.id));
+                                  await fetch("/api/admin/gallery", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ action: "delete", image: { id: img.id } }),
+                                  });
+                                }}
+                                className="text-black/25 dark:text-white/25 hover:text-red-500 transition-colors mt-0.5"
+                              >
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </Section>
 

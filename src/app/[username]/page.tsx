@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db";
-import { profiles, links, socialLinks, profileViews, products } from "@/db/schema";
+import { profiles, links, socialLinks, profileViews, products, galleryImages } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
@@ -20,6 +20,7 @@ import { PixelScripts } from "@/components/PixelScripts";
 import { BookingClient } from "@/app/book/[username]/BookingClient";
 import { CountdownCard } from "@/components/CountdownCard";
 import { HeroCard } from "@/components/HeroCard";
+import { MediaGallery } from "@/components/MediaGallery";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
@@ -41,10 +42,11 @@ export default async function ProfilePage({
 
   const isOwner = userId === profile.userId;
 
-  const [userLinks, userSocials, userProducts] = await Promise.all([
+  const [userLinks, userSocials, userProducts, userGallery] = await Promise.all([
     db.select().from(links).where(eq(links.profileId, profile.id)).orderBy(asc(links.position)),
     db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
     db.select().from(products).where(eq(products.profileId, profile.id)).orderBy(asc(products.position)),
+    db.select().from(galleryImages).where(eq(galleryImages.profileId, profile.id)).orderBy(asc(galleryImages.position)),
   ]);
   const activeProducts = userProducts.filter((p) => p.active);
 
@@ -264,6 +266,24 @@ export default async function ProfilePage({
             )
           )}
         </section>
+
+        {/* Media Gallery */}
+        {profile.galleryEnabled && userGallery.length > 0 && (
+          <section className="w-full mt-4">
+            <MediaGallery
+              images={userGallery.map((img) => ({
+                id: img.id,
+                imageUrl: img.imageUrl,
+                caption: img.caption,
+                linkUrl: img.linkUrl,
+                position: img.position,
+              }))}
+              title={profile.galleryTitle || "Gallery"}
+              columns={profile.galleryColumns ?? 3}
+              accentColor={accentColor}
+            />
+          </section>
+        )}
 
         {/* Store */}
         {activeProducts.length > 0 && (
