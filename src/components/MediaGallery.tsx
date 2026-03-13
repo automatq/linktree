@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { GalleryImage } from "@/data/links";
 
 export function MediaGallery({
@@ -15,6 +15,15 @@ export function MediaGallery({
   accentColor?: string;
 }) {
   const [lightbox, setLightbox] = useState<GalleryImage | null>(null);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLightbox(null);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [lightbox]);
 
   if (images.length === 0) return null;
 
