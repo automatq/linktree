@@ -69,6 +69,7 @@ export async function GET() {
       contactFormEnabled: profile.contactFormEnabled,
       contactFormTitle: profile.contactFormTitle,
       contactFormEmail: profile.contactFormEmail,
+      contactFormSmsNumber: profile.contactFormSmsNumber,
       galleryEnabled: profile.galleryEnabled,
       galleryTitle: profile.galleryTitle,
       galleryColumns: profile.galleryColumns,

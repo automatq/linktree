@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { contactFormEnabled, contactFormTitle, contactFormEmail } = await req.json();
+  const { contactFormEnabled, contactFormTitle, contactFormEmail, contactFormSmsNumber } = await req.json();
 
   await db
     .update(profiles)
@@ -16,6 +16,7 @@ export async function POST(req: Request) {
       contactFormEnabled: contactFormEnabled ?? false,
       contactFormTitle: contactFormTitle || "Get in touch",
       contactFormEmail: contactFormEmail || "",
+      contactFormSmsNumber: contactFormSmsNumber || "",
     })
     .where(eq(profiles.userId, userId));
 

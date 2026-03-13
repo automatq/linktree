@@ -67,6 +67,7 @@ export function AdminClient() {
   const [contactFormEnabled, setContactFormEnabled] = useState(false);
   const [contactFormTitle, setContactFormTitle] = useState("Get in touch");
   const [contactFormEmail, setContactFormEmail] = useState("");
+  const [contactFormSmsNumber, setContactFormSmsNumber] = useState("");
   const [contactFormSaving, setContactFormSaving] = useState(false);
   const [contactFormSaved, setContactFormSaved] = useState(false);
   const { signOut } = useClerk();
@@ -111,6 +112,7 @@ export function AdminClient() {
       setContactFormEnabled(d.profile?.contactFormEnabled ?? false);
       if (d.profile?.contactFormTitle) setContactFormTitle(d.profile.contactFormTitle);
       if (d.profile?.contactFormEmail) setContactFormEmail(d.profile.contactFormEmail);
+      if (d.profile?.contactFormSmsNumber) setContactFormSmsNumber(d.profile.contactFormSmsNumber);
       setGalleryEnabled(d.profile?.galleryEnabled ?? false);
       if (d.profile?.galleryTitle) setGalleryTitle(d.profile.galleryTitle);
       if (d.profile?.galleryColumns) setGalleryColumns(d.profile.galleryColumns);
@@ -761,7 +763,7 @@ export function AdminClient() {
                       await fetch("/api/admin/contact-form", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ contactFormEnabled, contactFormTitle, contactFormEmail }),
+                        body: JSON.stringify({ contactFormEnabled, contactFormTitle, contactFormEmail, contactFormSmsNumber }),
                       });
                       setContactFormSaving(false);
                       setContactFormSaved(true);
@@ -810,8 +812,19 @@ export function AdminClient() {
                         placeholder="you@example.com"
                       />
                     </div>
-                    {!contactFormEmail.trim() && (
-                      <p className="text-xs text-amber-500">Add your email address to receive messages.</p>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Instant SMS alerts (optional)</label>
+                      <input
+                        type="tel"
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                        value={contactFormSmsNumber}
+                        onChange={(e) => setContactFormSmsNumber(e.target.value)}
+                        placeholder="+1234567890"
+                      />
+                      <p className="text-[10px] text-black/30 dark:text-white/30">Get a text the moment someone messages you. Your number is never shared.</p>
+                    </div>
+                    {!contactFormEmail.trim() && !contactFormSmsNumber.trim() && (
+                      <p className="text-xs text-amber-500">Add an email or phone number to receive messages.</p>
                     )}
                   </div>
                 )}

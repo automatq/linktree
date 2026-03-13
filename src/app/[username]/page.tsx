@@ -331,7 +331,7 @@ export default async function ProfilePage({
         )}
 
         {/* Contact form */}
-        {profile.contactFormEnabled && profile.contactFormEmail && (
+        {profile.contactFormEnabled && (profile.contactFormEmail || profile.contactFormSmsNumber) && (
           <section className="w-full mt-4">
             <ContactFormWidget
               username={profile.username}

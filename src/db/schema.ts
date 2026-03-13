@@ -54,6 +54,7 @@ export const profiles = pgTable("profiles", {
   contactFormEnabled: boolean("contact_form_enabled").notNull().default(false),
   contactFormTitle: text("contact_form_title").notNull().default("Get in touch"),
   contactFormEmail: text("contact_form_email").notNull().default(""),
+  contactFormSmsNumber: text("contact_form_sms_number").notNull().default(""),
   // Media gallery
   galleryEnabled: boolean("gallery_enabled").notNull().default(false),
   galleryTitle: text("gallery_title").notNull().default("Gallery"),

@@ -58,6 +58,7 @@ export type Profile = {
   contactFormEnabled?: boolean;
   contactFormTitle?: string;
   contactFormEmail?: string;
+  contactFormSmsNumber?: string;
   galleryEnabled?: boolean;
   galleryTitle?: string;
   galleryColumns?: number;

@@ -63,6 +63,20 @@ export async function sendGuestReminderSms(data: SmsBookingData, label: string) 
   }).catch(() => {});
 }
 
+export async function sendContactFormSms(to: string, senderName: string, senderEmail: string, message: string) {
+  const client = getClient();
+  if (!client || !FROM || !to) return;
+
+  // Truncate message to keep SMS under 320 chars
+  const truncated = message.length > 200 ? message.slice(0, 197) + "..." : message;
+
+  await client.messages.create({
+    from: FROM,
+    to,
+    body: `💬 New message from ${senderName} (${senderEmail}):\n\n${truncated}`,
+  }).catch(() => {});
+}
+
 export async function sendHostReminderSms(data: SmsBookingData, label: string) {
   const client = getClient();
   if (!client || !FROM || !data.hostSmsNumber) return;
