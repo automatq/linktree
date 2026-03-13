@@ -31,20 +31,19 @@ export async function POST(req: Request) {
     });
 
     if (order) {
-      await db.update(orders)
-        .set({
-          status: "paid",
-          guestEmail: session.customer_details?.email || "",
-          guestName: session.customer_details?.name || "",
-        })
-        .where(eq(orders.id, order.id));
+      // Run update + related fetches in parallel
+      const [, product, profile] = await Promise.all([
+        db.update(orders)
+          .set({
+            status: "paid",
+            guestEmail: session.customer_details?.email || "",
+            guestName: session.customer_details?.name || "",
+          })
+          .where(eq(orders.id, order.id)),
+        db.query.products.findFirst({ where: eq(products.id, order.productId) }),
+        db.query.profiles.findFirst({ where: eq(profiles.id, order.profileId) }),
+      ]);
 
-      const product = await db.query.products.findFirst({
-        where: eq(products.id, order.productId),
-      });
-
-      // Fire webhook to profile owner
-      const profile = await db.query.profiles.findFirst({ where: eq(profiles.id, order.profileId) });
       if (profile?.webhookUrl) {
         await fireWebhook(profile.webhookUrl, "order.paid", {
           username: profile.username,
@@ -58,7 +57,7 @@ export async function POST(req: Request) {
       if (product?.fileUrl && session.customer_details?.email && process.env.RESEND_API_KEY) {
         const resend = new Resend(process.env.RESEND_API_KEY);
         await resend.emails.send({
-          from: "noreply@trilink-nine-neon.vercel.app",
+          from: "TriLink Store <bookings@resend.dev>",
           to: session.customer_details.email,
           subject: `Your download: ${product.title}`,
           html: `

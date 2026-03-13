@@ -73,7 +73,9 @@ export function ContactFormWidget({
       </div>
       <form onSubmit={handleSubmit} className="px-4 pb-4 flex flex-col gap-2.5">
         <div className="grid grid-cols-2 gap-2">
+          <label className="sr-only" htmlFor="contact-name">Name</label>
           <input
+            id="contact-name"
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -81,7 +83,9 @@ export function ContactFormWidget({
             required
             className="h-9 rounded-lg border border-black/10 dark:border-white/10 bg-transparent px-3 text-xs text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 outline-none focus:border-black/25 dark:focus:border-white/25 transition-colors"
           />
+          <label className="sr-only" htmlFor="contact-email">Email</label>
           <input
+            id="contact-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -90,7 +94,9 @@ export function ContactFormWidget({
             className="h-9 rounded-lg border border-black/10 dark:border-white/10 bg-transparent px-3 text-xs text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 outline-none focus:border-black/25 dark:focus:border-white/25 transition-colors"
           />
         </div>
+        <label className="sr-only" htmlFor="contact-message">Message</label>
         <textarea
+          id="contact-message"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Your message..."
@@ -98,7 +104,7 @@ export function ContactFormWidget({
           rows={3}
           className="rounded-lg border border-black/10 dark:border-white/10 bg-transparent px-3 py-2 text-xs text-black dark:text-white placeholder:text-black/30 dark:placeholder:text-white/30 outline-none focus:border-black/25 dark:focus:border-white/25 transition-colors resize-none"
         />
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p role="alert" className="text-xs text-red-500">{error}</p>}
         <button
           type="submit"
           disabled={sending || !name.trim() || !email.trim() || !message.trim()}

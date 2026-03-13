@@ -1692,7 +1692,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
 
 function EmbedSnippet({ username }: { username: string }) {
   const [copied, setCopied] = useState(false);
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://trilink-nine-neon.vercel.app";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
   const snippet = `<iframe\n  src="${origin}/embed/book/${username}"\n  width="100%"\n  height="700"\n  frameborder="0"\n  style="border-radius:12px;border:1px solid #e5e7eb;"\n></iframe>`;
 
   function copy() {

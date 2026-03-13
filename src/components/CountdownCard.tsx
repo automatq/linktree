@@ -23,10 +23,12 @@ export function CountdownCard({
   endDateStr: string;
   accentColor?: string;
 }) {
-  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(new Date(endDateStr)));
+  const [endDate] = useState(() => new Date(endDateStr));
+  const [timeLeft, setTimeLeft] = useState(() => getTimeLeft(endDate));
 
   useEffect(() => {
-    const id = setInterval(() => setTimeLeft(getTimeLeft(new Date(endDateStr))), 1000);
+    const parsed = new Date(endDateStr);
+    const id = setInterval(() => setTimeLeft(getTimeLeft(parsed)), 1000);
     return () => clearInterval(id);
   }, [endDateStr]);
 

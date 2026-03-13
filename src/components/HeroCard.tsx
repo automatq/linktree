@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 export function HeroCard({
   imageUrl,
   headline,
@@ -20,12 +22,15 @@ export function HeroCard({
   const inner = (
     <div className="w-full rounded-2xl border border-black/8 dark:border-white/8 overflow-hidden flex flex-col group transition-transform hover:scale-[1.01] active:scale-[0.99]">
       {imageUrl && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={imageUrl}
-          alt=""
-          className="w-full h-48 object-cover"
-        />
+        <div className="relative w-full h-48">
+          <Image
+            src={imageUrl}
+            alt={headline}
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 448px"
+          />
+        </div>
       )}
       <div className={`flex flex-col gap-2 p-5 ${!imageUrl ? "bg-black/[0.02] dark:bg-white/[0.02]" : ""}`}>
         <h2 className="text-base font-bold text-black dark:text-white leading-snug">

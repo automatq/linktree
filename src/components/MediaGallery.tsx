@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import type { GalleryImage } from "@/data/links";
 
 export function MediaGallery({
@@ -53,12 +54,12 @@ export function MediaGallery({
               className="group relative aspect-square overflow-hidden rounded-lg border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
               style={accentColor ? { "--tw-ring-color": accentColor } as React.CSSProperties : undefined}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={img.imageUrl}
                 alt={img.caption || ""}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
+                fill
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
+                sizes="(max-width: 768px) 33vw, 150px"
               />
               {img.caption && (
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -73,6 +74,9 @@ export function MediaGallery({
       {/* Lightbox */}
       {lightbox && (
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={lightbox.caption || "Image lightbox"}
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
           onClick={() => setLightbox(null)}
         >
@@ -83,6 +87,7 @@ export function MediaGallery({
             {/* Close button */}
             <button
               onClick={() => setLightbox(null)}
+              aria-label="Close image"
               className="absolute top-3 right-3 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -92,12 +97,16 @@ export function MediaGallery({
             </button>
 
             {/* Image */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={lightbox.imageUrl}
-              alt={lightbox.caption || ""}
-              className="w-full max-h-[65vh] object-contain bg-black/5 dark:bg-white/5"
-            />
+            <div className="relative w-full" style={{ minHeight: "300px", maxHeight: "65vh" }}>
+              <Image
+                src={lightbox.imageUrl}
+                alt={lightbox.caption || ""}
+                fill
+                className="object-contain bg-black/5 dark:bg-white/5"
+                sizes="(max-width: 768px) 100vw, 512px"
+                priority
+              />
+            </div>
 
             {/* Caption + Link */}
             {(lightbox.caption || lightbox.linkUrl) && (
