@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { Icon, ArrowRightIcon } from "./Icons";
 import type { Link } from "@/data/links";
 
@@ -112,6 +113,7 @@ type LinkCardProps = {
 export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md", accentColor }: LinkCardProps) {
   const s = STYLES[cardStyle] ?? STYLES.minimal;
   const z = SIZES[cardSize] ?? SIZES.md;
+  const [iframeOpen, setIframeOpen] = useState(false);
 
   const isSolid = cardStyle === "solid";
 
@@ -130,36 +132,116 @@ export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md", 
     ? { backgroundColor: accentColor + "22", color: accentColor }
     : undefined;
 
+  const actualUrl = /^https?:\/\//i.test(link.url) ? link.url : `https://${link.url}`;
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    // Fire click tracking
+    fetch(`/api/go/${link.id}`, { method: "GET", redirect: "manual" }).catch(() => {});
+    setIframeOpen(true);
+  };
+
+  const close = useCallback(() => setIframeOpen(false), []);
+
+  // Escape key closes overlay
+  useEffect(() => {
+    if (!iframeOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [iframeOpen, close]);
+
   return (
-    <a
-      href={`/api/go/${link.id}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className={`animate-fade-in-up group flex items-center ${z.padding} ${z.gap} transition-all duration-200 ${s.card}`}
-      style={{ animationDelay: `${index * 60}ms`, ...cardAccentStyle, ...sharpAccentStyle }}
-    >
-      {link.icon && (
-        <span
-          className={`flex ${z.iconWrap} shrink-0 items-center justify-center rounded-lg transition-colors ${s.iconWrap}`}
-          style={iconAccentStyle}
-        >
-          <Icon name={link.icon} size={z.iconSize} />
-        </span>
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className={`truncate font-medium ${z.title} ${s.title}`}>
-          {link.title}
-        </span>
-        {link.description && (
-          <span className={`truncate mt-0.5 ${z.desc} ${s.desc}`}>
-            {link.description}
+    <>
+      <a
+        href={actualUrl}
+        onClick={handleClick}
+        className={`animate-fade-in-up group flex items-center ${z.padding} ${z.gap} transition-all duration-200 ${s.card} cursor-pointer`}
+        style={{ animationDelay: `${index * 60}ms`, ...cardAccentStyle, ...sharpAccentStyle }}
+      >
+        {link.icon && (
+          <span
+            className={`flex ${z.iconWrap} shrink-0 items-center justify-center rounded-lg transition-colors ${s.iconWrap}`}
+            style={iconAccentStyle}
+          >
+            <Icon name={link.icon} size={z.iconSize} />
           </span>
         )}
-      </div>
-      <ArrowRightIcon
-        size={z.arrowSize}
-        className={`shrink-0 transition-all duration-200 ${s.arrow}`}
-      />
-    </a>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <span className={`truncate font-medium ${z.title} ${s.title}`}>
+            {link.title}
+          </span>
+          {link.description && (
+            <span className={`truncate mt-0.5 ${z.desc} ${s.desc}`}>
+              {link.description}
+            </span>
+          )}
+        </div>
+        <ArrowRightIcon
+          size={z.arrowSize}
+          className={`shrink-0 transition-all duration-200 ${s.arrow}`}
+        />
+      </a>
+
+      {/* Iframe overlay */}
+      {iframeOpen && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-sm animate-fade-in"
+          onClick={close}
+        >
+          {/* Top bar */}
+          <div
+            className="flex items-center justify-between px-4 py-2.5 bg-white dark:bg-neutral-900 border-b border-black/10 dark:border-white/10 shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              {link.icon && <Icon name={link.icon} size={16} />}
+              <span className="text-sm font-medium text-black dark:text-white truncate">
+                {link.title}
+              </span>
+              <span className="text-[11px] text-black/30 dark:text-white/30 truncate hidden sm:inline">
+                {actualUrl}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={actualUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-xs text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors px-2 py-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                <span className="hidden sm:inline">Open</span>
+              </a>
+              <button
+                onClick={close}
+                aria-label="Close"
+                className="flex h-7 w-7 items-center justify-center rounded-md text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Iframe */}
+          <div className="flex-1 min-h-0" onClick={(e) => e.stopPropagation()}>
+            <iframe
+              src={actualUrl}
+              title={link.title}
+              className="w-full h-full border-0 bg-white"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
