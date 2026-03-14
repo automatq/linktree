@@ -23,6 +23,7 @@ import { HeroCard } from "@/components/HeroCard";
 import { MediaGallery } from "@/components/MediaGallery";
 import { ContactFormWidget } from "@/components/ContactFormWidget";
 import { GroupShowcase } from "@/components/GroupShowcase";
+import { WallCanvas } from "@/components/WallCanvas";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
@@ -432,6 +433,17 @@ export default async function ProfilePage({
             <ContactFormWidget
               username={profile.username}
               title={profile.contactFormTitle || "Get in touch"}
+              accentColor={accentColor}
+            />
+          </section>
+        )}
+
+        {/* The Wall */}
+        {profile.wallEnabled && (
+          <section className="w-full mt-6">
+            <WallCanvas
+              username={profile.username}
+              title={profile.wallTitle || "The Wall"}
               accentColor={accentColor}
             />
           </section>

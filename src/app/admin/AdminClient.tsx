@@ -94,6 +94,10 @@ export function AdminClient() {
   const [contactFormTitle, setContactFormTitle] = useState("Get in touch");
   const [contactFormEmail, setContactFormEmail] = useState("");
   const [contactFormSmsNumber, setContactFormSmsNumber] = useState("");
+  const [wallEnabled, setWallEnabled] = useState(false);
+  const [wallTitle, setWallTitle] = useState("The Wall");
+  const [wallMaxNotes, setWallMaxNotes] = useState(50);
+  const [wallNotes, setWallNotes] = useState<Array<{ id: string; authorName: string; message: string; color: string; createdAt: string }>>([]);
   const [showUsernameChange, setShowUsernameChange] = useState(false);
   const { signOut } = useClerk();
 
@@ -146,6 +150,13 @@ export function AdminClient() {
       fetch("/api/admin/gallery").then((r) => r.json()).then((g) => {
         if (g.images) setGalleryImages(g.images);
       });
+      // Load wall data
+      fetch("/api/admin/wall").then((r) => r.json()).then((w) => {
+        setWallEnabled(w.wallEnabled ?? false);
+        if (w.wallTitle) setWallTitle(w.wallTitle);
+        if (w.wallMaxNotes) setWallMaxNotes(w.wallMaxNotes);
+        setWallNotes(w.notes || []);
+      });
     }).catch(() => {
       setLoadError(true);
     });
@@ -197,6 +208,14 @@ export function AdminClient() {
       }),
     ]);
   }, [gallerySettingsKey]);
+
+  const wallAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/wall", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "settings", wallEnabled, wallTitle, wallMaxNotes }),
+    });
+  }, [wallEnabled, wallTitle, wallMaxNotes]);
 
   const pixelAutoStatus = useAutosave(async () => {
     await fetch("/api/admin/pixels", {
@@ -1313,6 +1332,99 @@ export function AdminClient() {
                     </div>
                   ))}
                 </div>
+              </div>
+            </Section>
+
+            {/* The Wall section */}
+            <Section
+              title="The Wall"
+              action={<AutosaveIndicator status={wallAutoStatus} />}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Enable The Wall</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Let visitors leave sticky notes on your profile</p>
+                  </div>
+                  <button
+                    onClick={() => setWallEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${wallEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${wallEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {wallEnabled && (
+                  <div className="flex flex-col gap-3">
+                    <Field label="Wall title">
+                      <Input value={wallTitle} onChange={(v) => setWallTitle(v)} placeholder="The Wall" />
+                    </Field>
+                    <Field label="Max notes displayed">
+                      <select
+                        value={wallMaxNotes}
+                        onChange={(e) => setWallMaxNotes(Number(e.target.value))}
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-sm text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                      >
+                        {[20, 30, 50, 75, 100].map((n) => (
+                          <option key={n} value={n}>{n} notes</option>
+                        ))}
+                      </select>
+                    </Field>
+
+                    {/* Moderation */}
+                    <div className="pt-2 border-t border-black/5 dark:border-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[11px] text-black/40 dark:text-white/40 uppercase tracking-wider">
+                          Notes ({wallNotes.length})
+                        </span>
+                        {wallNotes.length > 0 && (
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Clear all notes from the wall?")) return;
+                              await fetch("/api/admin/wall", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "clear" }),
+                              });
+                              setWallNotes([]);
+                            }}
+                            className="text-[10px] text-red-400 hover:text-red-500 transition-colors"
+                          >
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+                      {wallNotes.length === 0 ? (
+                        <p className="text-xs text-black/25 dark:text-white/25 py-2">No notes yet</p>
+                      ) : (
+                        <div className="flex flex-col gap-1.5 max-h-64 overflow-y-auto">
+                          {wallNotes.map((note) => (
+                            <div key={note.id} className="flex items-start gap-2 p-2 rounded-lg border border-black/5 dark:border-white/5 text-xs">
+                              <div className="flex-1 min-w-0">
+                                <span className="font-medium text-black dark:text-white">{note.authorName || "Anonymous"}</span>
+                                <span className="text-black/30 dark:text-white/30"> · </span>
+                                <span className="text-black/50 dark:text-white/50">{note.message}</span>
+                              </div>
+                              <button
+                                onClick={async () => {
+                                  await fetch("/api/admin/wall", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ action: "delete", noteId: note.id }),
+                                  });
+                                  setWallNotes((prev) => prev.filter((n) => n.id !== note.id));
+                                }}
+                                className="shrink-0 text-[10px] text-red-400 hover:text-red-500 transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </Section>
           </>

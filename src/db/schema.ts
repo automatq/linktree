@@ -61,6 +61,10 @@ export const profiles = pgTable("profiles", {
   galleryColumns: integer("gallery_columns").notNull().default(3),
   // Groups
   groupsEnabled: boolean("groups_enabled").notNull().default(false),
+  // The Wall
+  wallEnabled: boolean("wall_enabled").notNull().default(false),
+  wallTitle: text("wall_title").notNull().default("The Wall"),
+  wallMaxNotes: integer("wall_max_notes").notNull().default(50),
   usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
@@ -221,6 +225,19 @@ export const groupMembers = pgTable("group_members", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("group_members_group_id_idx").on(t.groupId),
+]);
+
+// The Wall — community sticky notes on a creator's profile
+export const wallNotes = pgTable("wall_notes", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  authorName: text("author_name").notNull().default(""),
+  message: text("message").notNull(),
+  color: text("color").notNull().default("yellow"), // yellow, blue, green, pink, purple
+  rotation: integer("rotation").notNull().default(0), // degrees -6 to 6
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("wall_notes_profile_id_idx").on(t.profileId),
 ]);
 
 // Individual bookings

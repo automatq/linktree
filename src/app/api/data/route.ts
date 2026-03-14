@@ -74,6 +74,9 @@ export async function GET() {
       galleryTitle: profile.galleryTitle,
       galleryColumns: profile.galleryColumns,
       groupsEnabled: profile.groupsEnabled,
+      wallEnabled: profile.wallEnabled,
+      wallTitle: profile.wallTitle,
+      wallMaxNotes: profile.wallMaxNotes,
     },
     links: userLinks.map((l) => ({
       id: l.id,

@@ -63,6 +63,9 @@ export type Profile = {
   galleryTitle?: string;
   galleryColumns?: number;
   groupsEnabled?: boolean;
+  wallEnabled?: boolean;
+  wallTitle?: string;
+  wallMaxNotes?: number;
 };
 
 export type GalleryImage = {
