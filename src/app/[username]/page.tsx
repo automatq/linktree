@@ -6,7 +6,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db";
 import { profiles, links, socialLinks, profileViews, products, galleryImages, previousUsernames, groups, groupMembers } from "@/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
 import { SocialLinks } from "@/components/SocialLinks";
@@ -132,7 +132,7 @@ export default async function ProfilePage({
           })
           .from(groupMembers)
           .innerJoin(profiles, eq(groupMembers.memberProfileId, profiles.id))
-          .where(eq(groupMembers.groupId, g.id))
+          .where(and(eq(groupMembers.groupId, g.id), eq(groupMembers.status, "accepted")))
           .orderBy(asc(groupMembers.position));
         return { id: g.id, name: g.name, members };
       }));
@@ -375,10 +375,10 @@ export default async function ProfilePage({
           </section>
         )}
 
-        {/* Groups */}
-        {profile.groupsEnabled && userGroups.length > 0 && (
+        {/* Groups — only show groups that have at least one accepted member */}
+        {profile.groupsEnabled && userGroups.filter((g) => g.members.length > 0).length > 0 && (
           <div className="w-full mt-4 flex flex-col gap-4">
-            <GroupShowcase groups={userGroups} accentColor={accentColor} />
+            <GroupShowcase groups={userGroups.filter((g) => g.members.length > 0)} accentColor={accentColor} />
           </div>
         )}
 

@@ -2149,6 +2149,7 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
 type GroupMember = {
   id: string;
   position: number;
+  status: string;
   profileId: number;
   username: string;
   name: string;
@@ -2172,25 +2173,37 @@ type SearchResult = {
   avatarInitials: string;
 };
 
+type Invitation = {
+  id: string;
+  groupId: string;
+  status: string;
+  groupName: string;
+  ownerName: string;
+  ownerUsername: string;
+  ownerAvatarUrl: string;
+  ownerAvatarInitials: string;
+};
+
 function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
   const [enabled, setEnabled] = useState(profile.groupsEnabled ?? false);
   const [groupsList, setGroupsList] = useState<Group[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const [addingToGroup, setAddingToGroup] = useState<string | null>(null); // groupId currently adding to
+  const [addingToGroup, setAddingToGroup] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     fetch("/api/admin/groups").then((r) => r.json()).then((d) => {
       setGroupsList(d.groups || []);
+      setInvitations(d.invitations || []);
       setEnabled(d.groupsEnabled ?? false);
       setLoading(false);
     });
   }, []);
 
-  // Autosave enabled toggle
   const enabledAutoStatus = useAutosave(async () => {
     await fetch("/api/admin/groups", {
       method: "POST",
@@ -2260,7 +2273,6 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
       alert(d.error);
       return;
     }
-    // Re-fetch to get fresh data with member profile info
     const fresh = await fetch("/api/admin/groups").then((r) => r.json());
     setGroupsList(fresh.groups || []);
     setSearchQuery("");
@@ -2281,12 +2293,66 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
     );
   }
 
+  async function respondToInvite(memberId: string, response: "accepted" | "declined") {
+    await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "respond", memberId, response }),
+    });
+    setInvitations((prev) => prev.filter((inv) => inv.id !== memberId));
+  }
+
   if (loading) {
     return <div className="text-sm text-black/40 dark:text-white/40 text-center py-12">Loading…</div>;
   }
 
   return (
     <div className="flex flex-col gap-8">
+      {/* Incoming invitations */}
+      {invitations.length > 0 && (
+        <Section title="Invitations">
+          <p className="text-xs text-black/40 dark:text-white/40 -mt-1">
+            Other creators want to add you to their group
+          </p>
+          <div className="flex flex-col gap-2">
+            {invitations.map((inv) => (
+              <div key={inv.id} className="flex items-center gap-3 p-3 rounded-lg border border-amber-200 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-900/10">
+                <div className="h-9 w-9 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
+                  {inv.ownerAvatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={inv.ownerAvatarUrl} alt="" className="h-full w-full object-cover" />
+                  ) : (
+                    <span className="text-[10px] font-semibold text-black/40 dark:text-white/40">{inv.ownerAvatarInitials || "?"}</span>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-black dark:text-white">
+                    <span className="font-medium">{inv.ownerName || inv.ownerUsername}</span>
+                    <span className="text-black/40 dark:text-white/40"> wants to add you to </span>
+                    <span className="font-medium">{inv.groupName}</span>
+                  </p>
+                  <p className="text-xs text-black/40 dark:text-white/40">@{inv.ownerUsername}</p>
+                </div>
+                <div className="flex gap-1.5 shrink-0">
+                  <button
+                    onClick={() => respondToInvite(inv.id, "accepted")}
+                    className="h-7 px-3 rounded-md bg-emerald-500 text-white text-xs font-medium hover:bg-emerald-600 transition-colors"
+                  >
+                    Accept
+                  </button>
+                  <button
+                    onClick={() => respondToInvite(inv.id, "declined")}
+                    className="h-7 px-3 rounded-md border border-black/10 dark:border-white/10 text-xs text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    Decline
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
       {/* Enable toggle */}
       <Section title="Groups" action={<AutosaveIndicator status={enabledAutoStatus} />}>
         <div className="flex items-center justify-between">
@@ -2305,7 +2371,6 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
 
       {enabled && (
         <>
-          {/* Groups list */}
           {groupsList.map((group) => (
             <Section
               key={group.id}
@@ -2319,7 +2384,6 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                 </button>
               }
             >
-              {/* Group name */}
               <Field label="Group name">
                 <Input
                   value={group.name}
@@ -2328,14 +2392,17 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                 />
               </Field>
 
-              {/* Current members */}
               <Field label="Members">
                 {group.members.length === 0 ? (
                   <p className="text-xs text-black/30 dark:text-white/30 py-2">No members yet — search for users to add</p>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {group.members.map((m) => (
-                      <div key={m.id} className="flex items-center gap-3 p-2 rounded-lg border border-black/5 dark:border-white/5">
+                      <div key={m.id} className={`flex items-center gap-3 p-2 rounded-lg border ${
+                        m.status === "pending" ? "border-amber-200 dark:border-amber-800/40 bg-amber-50/30 dark:bg-amber-900/5" :
+                        m.status === "declined" ? "border-red-200 dark:border-red-800/40 bg-red-50/30 dark:bg-red-900/5 opacity-60" :
+                        "border-black/5 dark:border-white/5"
+                      }`}>
                         <div className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
                           {m.avatarUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -2345,7 +2412,19 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-black dark:text-white truncate">{m.name || m.username}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-black dark:text-white truncate">{m.name || m.username}</p>
+                            {m.status === "pending" && (
+                              <span className="shrink-0 text-[10px] font-medium text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-1.5 py-0.5 rounded">
+                                Pending
+                              </span>
+                            )}
+                            {m.status === "declined" && (
+                              <span className="shrink-0 text-[10px] font-medium text-red-500 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded">
+                                Declined
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-black/40 dark:text-white/40">@{m.username}</p>
                         </div>
                         <button
@@ -2360,7 +2439,6 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                 )}
               </Field>
 
-              {/* Add member search */}
               {addingToGroup === group.id ? (
                 <div className="flex flex-col gap-2">
                   <div className="flex gap-2">
@@ -2382,13 +2460,17 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                   {searchResults.length > 0 && (
                     <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
                       {searchResults.map((r) => {
-                        const alreadyMember = group.members.some((m) => m.profileId === r.id);
+                        const existing = group.members.find((m) => m.profileId === r.id);
+                        const label = existing
+                          ? existing.status === "pending" ? "Invited" : existing.status === "declined" ? "Declined" : "Added"
+                          : "Invite";
+                        const disabled = !!existing && existing.status !== "declined";
                         return (
                           <button
                             key={r.id}
-                            onClick={() => !alreadyMember && addMember(group.id, r.id)}
-                            disabled={alreadyMember}
-                            className={`flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${alreadyMember ? "opacity-40 cursor-not-allowed" : "hover:bg-black/5 dark:hover:bg-white/5"}`}
+                            onClick={() => !disabled && addMember(group.id, r.id)}
+                            disabled={disabled}
+                            className={`flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${disabled ? "opacity-40 cursor-not-allowed" : "hover:bg-black/5 dark:hover:bg-white/5"}`}
                           >
                             <div className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
                               {r.avatarUrl ? (
@@ -2402,9 +2484,7 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                               <p className="text-sm text-black dark:text-white truncate">{r.name || r.username}</p>
                               <p className="text-xs text-black/40 dark:text-white/40">@{r.username}</p>
                             </div>
-                            <span className="text-xs text-black/30 dark:text-white/30">
-                              {alreadyMember ? "Added" : "Add"}
-                            </span>
+                            <span className="text-xs text-black/30 dark:text-white/30">{label}</span>
                           </button>
                         );
                       })}
@@ -2419,13 +2499,12 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                   onClick={() => setAddingToGroup(group.id)}
                   className="h-8 w-full rounded-md border border-dashed border-black/15 dark:border-white/15 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
                 >
-                  + Add member
+                  + Invite member
                 </button>
               )}
             </Section>
           ))}
 
-          {/* Add group button */}
           <button
             onClick={createGroup}
             className="h-10 w-full rounded-xl border border-dashed border-black/15 dark:border-white/15 text-xs font-medium text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
