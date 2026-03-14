@@ -94,6 +94,9 @@ export function AdminClient() {
   const [contactFormTitle, setContactFormTitle] = useState("Get in touch");
   const [contactFormEmail, setContactFormEmail] = useState("");
   const [contactFormSmsNumber, setContactFormSmsNumber] = useState("");
+  const [reviewsEnabled, setReviewsEnabled] = useState(false);
+  const [reviewsList, setReviewsList] = useState<Array<{ id: string; recommend: boolean; audioDuration: number; text: string; response: string; hidden: boolean; authorUsername: string; createdAt: string }>>([]);
+  const [reviewStats, setReviewStats] = useState<{ total: number; recommended: number; percentage: number } | null>(null);
   const [voiceRoomsEnabled, setVoiceRoomsEnabled] = useState(false);
   const [voiceRoomsList, setVoiceRoomsList] = useState<Array<{ id: string; prompt: string; active: boolean; notes: Array<{ id: string; authorUsername: string; duration: number }> }>>([]);
   const [wallEnabled, setWallEnabled] = useState(false);
@@ -151,6 +154,12 @@ export function AdminClient() {
       // Load gallery images
       fetch("/api/admin/gallery").then((r) => r.json()).then((g) => {
         if (g.images) setGalleryImages(g.images);
+      });
+      // Load reviews
+      fetch("/api/admin/reviews").then((r) => r.json()).then((rv) => {
+        setReviewsEnabled(rv.reviewsEnabled ?? false);
+        setReviewsList(rv.reviews || []);
+        setReviewStats(rv.stats || null);
       });
       // Load voice rooms
       fetch("/api/admin/voice-rooms").then((r) => r.json()).then((v) => {
@@ -215,6 +224,14 @@ export function AdminClient() {
       }),
     ]);
   }, [gallerySettingsKey]);
+
+  const reviewsAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "settings", reviewsEnabled }),
+    });
+  }, [reviewsEnabled]);
 
   const voiceRoomsAutoStatus = useAutosave(async () => {
     await fetch("/api/admin/voice-rooms", {
@@ -907,6 +924,85 @@ export function AdminClient() {
                     </div>
                     {!contactFormEmail.trim() && !contactFormSmsNumber.trim() && (
                       <p className="text-xs text-amber-500">Add an email or phone number to receive messages.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Reviews section */}
+            <Section
+              title="Reviews"
+              action={<AutosaveIndicator status={reviewsAutoStatus} />}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Enable Reviews</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Voice-first reviews from real users — you can respond but not delete</p>
+                  </div>
+                  <button
+                    onClick={() => setReviewsEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${reviewsEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${reviewsEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {reviewsEnabled && (
+                  <div className="flex flex-col gap-3">
+                    {/* Stats */}
+                    {reviewStats && (
+                      <div className="flex items-center gap-4 p-3 rounded-lg bg-black/[0.03] dark:bg-white/[0.03]">
+                        <div className="text-center">
+                          <p className={`text-lg font-bold ${reviewStats.percentage >= 80 ? "text-emerald-600" : reviewStats.percentage >= 50 ? "text-amber-600" : "text-red-500"}`}>{reviewStats.percentage}%</p>
+                          <p className="text-[10px] text-black/40 dark:text-white/40">recommend</p>
+                        </div>
+                        <div className="text-center">
+                          <p className="text-lg font-bold text-black dark:text-white">{reviewStats.total}</p>
+                          <p className="text-[10px] text-black/40 dark:text-white/40">reviews</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Reviews list */}
+                    {reviewsList.length === 0 ? (
+                      <p className="text-xs text-black/25 dark:text-white/25 py-2">No reviews yet</p>
+                    ) : (
+                      <div className="flex flex-col gap-2 max-h-80 overflow-y-auto">
+                        {reviewsList.map((r) => (
+                          <div key={r.id} className={`flex flex-col gap-2 p-3 rounded-lg border ${r.hidden ? "border-red-200 dark:border-red-800/40 opacity-50" : "border-black/5 dark:border-white/5"}`}>
+                            <div className="flex items-center gap-2 text-xs">
+                              <span className={r.recommend ? "text-emerald-600" : "text-red-500"}>
+                                {r.recommend ? "+" : "-"}
+                              </span>
+                              <span className="font-medium text-black dark:text-white">@{r.authorUsername}</span>
+                              {r.text && <span className="text-black/40 dark:text-white/40 truncate flex-1">— {r.text}</span>}
+                            </div>
+                            {/* Respond */}
+                            <div className="flex gap-2">
+                              <input
+                                value={r.response}
+                                onChange={(e) => setReviewsList((prev) => prev.map((rv) => rv.id === r.id ? { ...rv, response: e.target.value } : rv))}
+                                placeholder="Write a public response…"
+                                className="h-7 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-[11px] text-black dark:text-white placeholder-black/20 dark:placeholder-white/20 outline-none"
+                              />
+                              <button
+                                onClick={async () => {
+                                  await fetch("/api/admin/reviews", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ action: "respond", reviewId: r.id, response: r.response }),
+                                  });
+                                }}
+                                className="shrink-0 h-7 px-2 rounded-md border border-black/10 dark:border-white/10 text-[10px] text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 )}

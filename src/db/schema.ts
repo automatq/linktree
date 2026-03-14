@@ -67,6 +67,8 @@ export const profiles = pgTable("profiles", {
   wallMaxNotes: integer("wall_max_notes").notNull().default(50),
   // Voice Rooms
   voiceRoomsEnabled: boolean("voice_rooms_enabled").notNull().default(false),
+  // Reviews
+  reviewsEnabled: boolean("reviews_enabled").notNull().default(false),
   usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
@@ -265,6 +267,26 @@ export const voiceNotes = pgTable("voice_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("voice_notes_room_id_idx").on(t.roomId),
+]);
+
+// Reviews — voice-first reviews with verified client badge
+export const reviews = pgTable("reviews", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  authorProfileId: integer("author_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  recommend: boolean("recommend").notNull(), // thumbs up (true) / thumbs down (false)
+  audioUrl: text("audio_url").notNull(), // voice review (required)
+  audioDuration: integer("audio_duration").notNull().default(0), // seconds
+  text: text("text").notNull().default(""), // optional written summary
+  photos: text("photos").notNull().default("[]"), // JSON array of photo URLs
+  verifiedClient: boolean("verified_client").notNull().default(false),
+  response: text("response").notNull().default(""), // creator's public response
+  respondedAt: timestamp("responded_at"),
+  hidden: boolean("hidden").notNull().default(false), // auto-hidden after reports
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("reviews_profile_id_idx").on(t.profileId),
+  index("reviews_author_profile_id_idx").on(t.authorProfileId),
 ]);
 
 // Individual bookings

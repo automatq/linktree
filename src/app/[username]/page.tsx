@@ -24,6 +24,7 @@ import { MediaGallery } from "@/components/MediaGallery";
 import { ContactFormWidget } from "@/components/ContactFormWidget";
 import { GroupShowcase } from "@/components/GroupShowcase";
 import { WallCanvas } from "@/components/WallCanvas";
+import { ReviewSection } from "@/components/ReviewSection";
 import { VoiceRooms } from "@/components/VoiceRoom";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
@@ -408,6 +409,13 @@ export default async function ProfilePage({
                 accentColor={accentColor}
               />
             ))}
+          </section>
+        )}
+
+        {/* Reviews */}
+        {profile.reviewsEnabled && (
+          <section className="w-full mt-4">
+            <ReviewSection username={profile.username} accentColor={accentColor} />
           </section>
         )}
 

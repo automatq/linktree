@@ -74,6 +74,7 @@ export async function GET() {
       galleryTitle: profile.galleryTitle,
       galleryColumns: profile.galleryColumns,
       groupsEnabled: profile.groupsEnabled,
+      reviewsEnabled: profile.reviewsEnabled,
       voiceRoomsEnabled: profile.voiceRoomsEnabled,
       wallEnabled: profile.wallEnabled,
       wallTitle: profile.wallTitle,

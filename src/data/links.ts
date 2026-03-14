@@ -63,6 +63,7 @@ export type Profile = {
   galleryTitle?: string;
   galleryColumns?: number;
   groupsEnabled?: boolean;
+  reviewsEnabled?: boolean;
   voiceRoomsEnabled?: boolean;
   wallEnabled?: boolean;
   wallTitle?: string;
