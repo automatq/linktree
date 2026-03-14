@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useClerk } from "@clerk/nextjs";
 import { QRCodeCanvas } from "qrcode.react";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -8,6 +8,41 @@ import type { LinksData, Link, SocialLink } from "@/data/links";
 import { getEmbedPlatform } from "@/components/EmbedCard";
 
 const ICONS = ["globe", "zap", "pen", "mail", "calendar", "phone", "video", "mappin", "star", "heart", "music", "file", "shop", "mic", "coffee", "tiktok", "github", "twitter", "linkedin", "youtube"];
+
+// ── Autosave hook ────────────────────────────────────────────────────────────
+function useAutosave(saveFn: () => Promise<void>, deps: unknown[], delay = 800) {
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const isFirst = useRef(true);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+
+  useEffect(() => {
+    // Skip the initial mount — only save on actual changes
+    if (isFirst.current) { isFirst.current = false; return; }
+    setStatus("idle");
+    clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      setStatus("saving");
+      try { await saveFn(); } catch { /* swallow */ }
+      setStatus("saved");
+      setTimeout(() => setStatus((s) => s === "saved" ? "idle" : s), 2000);
+    }, delay);
+    return () => clearTimeout(timer.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+
+  return status;
+}
+
+function AutosaveIndicator({ status }: { status: "idle" | "saving" | "saved" }) {
+  return (
+    <span className={`text-xs transition-all duration-300 ${
+      status === "saving" ? "text-black/40 dark:text-white/40" :
+      status === "saved" ? "text-emerald-500" : "opacity-0"
+    }`}>
+      {status === "saving" ? "Saving…" : status === "saved" ? "Saved" : "Saved"}
+    </span>
+  );
+}
 
 function genId() {
   return Math.random().toString(36).slice(2, 9);
@@ -27,8 +62,6 @@ type Stats = {
 
 export function AdminClient() {
   const [data, setData] = useState<LinksData | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [customDomain, setCustomDomain] = useState("");
   const [savingDomain, setSavingDomain] = useState(false);
@@ -42,11 +75,7 @@ export function AdminClient() {
   const [metaPixelId, setMetaPixelId] = useState("");
   const [tiktokPixelId, setTiktokPixelId] = useState("");
   const [googleTagId, setGoogleTagId] = useState("");
-  const [pixelSaving, setPixelSaving] = useState(false);
-  const [pixelSaved, setPixelSaved] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState("");
-  const [webhookSaving, setWebhookSaving] = useState(false);
-  const [webhookSaved, setWebhookSaved] = useState(false);
   const [webhookTesting, setWebhookTesting] = useState(false);
   const [webhookTestResult, setWebhookTestResult] = useState<string | null>(null);
   const [heroEnabled, setHeroEnabled] = useState(false);
@@ -55,22 +84,16 @@ export function AdminClient() {
   const [heroSubtitle, setHeroSubtitle] = useState("");
   const [heroCtaText, setHeroCtaText] = useState("");
   const [heroCtaUrl, setHeroCtaUrl] = useState("");
-  const [heroSaving, setHeroSaving] = useState(false);
-  const [heroSaved, setHeroSaved] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
   const [galleryEnabled, setGalleryEnabled] = useState(false);
   const [galleryTitle, setGalleryTitle] = useState("Gallery");
   const [galleryColumns, setGalleryColumns] = useState(3);
   const [galleryImages, setGalleryImages] = useState<Array<{ id: string; imageUrl: string; caption: string; linkUrl: string; position: number }>>([]);
-  const [gallerySaving, setGallerySaving] = useState(false);
-  const [gallerySaved, setGallerySaved] = useState(false);
   const [galleryUploading, setGalleryUploading] = useState(false);
   const [contactFormEnabled, setContactFormEnabled] = useState(false);
   const [contactFormTitle, setContactFormTitle] = useState("Get in touch");
   const [contactFormEmail, setContactFormEmail] = useState("");
   const [contactFormSmsNumber, setContactFormSmsNumber] = useState("");
-  const [contactFormSaving, setContactFormSaving] = useState(false);
-  const [contactFormSaved, setContactFormSaved] = useState(false);
   const [showUsernameChange, setShowUsernameChange] = useState(false);
   const { signOut } = useClerk();
 
@@ -128,20 +151,68 @@ export function AdminClient() {
     });
   }, [checkDomainStatus]);
 
-  const save = useCallback(async (next: LinksData) => {
-    setSaving(true);
-    setSaved(false);
+  // Stable ref to latest data for autosave (avoids stale closures)
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
+  const profileAutoStatus = useAutosave(async () => {
+    if (!dataRef.current) return;
     const res = await fetch("/api/data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(next),
+      body: JSON.stringify(dataRef.current),
     });
     const json = await res.json();
     if (json.username) setUsername(json.username);
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  }, []);
+  }, [data]);
+
+  const heroAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/hero", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ heroEnabled, heroImageUrl, heroHeadline, heroSubtitle, heroCtaText, heroCtaUrl }),
+    });
+  }, [heroEnabled, heroImageUrl, heroHeadline, heroSubtitle, heroCtaText, heroCtaUrl]);
+
+  const contactFormAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/contact-form", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactFormEnabled, contactFormTitle, contactFormEmail, contactFormSmsNumber }),
+    });
+  }, [contactFormEnabled, contactFormTitle, contactFormEmail, contactFormSmsNumber]);
+
+  const gallerySettingsKey = useMemo(() => JSON.stringify({ galleryEnabled, galleryTitle, galleryColumns, galleryImages }), [galleryEnabled, galleryTitle, galleryColumns, galleryImages]);
+  const galleryAutoStatus = useAutosave(async () => {
+    await Promise.all([
+      fetch("/api/admin/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "settings", galleryEnabled, galleryTitle, galleryColumns }),
+      }),
+      fetch("/api/admin/gallery", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "bulk", images: galleryImages }),
+      }),
+    ]);
+  }, [gallerySettingsKey]);
+
+  const pixelAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/pixels", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metaPixelId, tiktokPixelId, googleTagId }),
+    });
+  }, [metaPixelId, tiktokPixelId, googleTagId]);
+
+  const webhookAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/webhook", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ webhookUrl }),
+    });
+  }, [webhookUrl]);
 
   if (!data) {
     return (
@@ -361,18 +432,7 @@ export function AdminClient() {
         {tab === "content" && (
           <>
             {/* Profile section */}
-            <Section title="Profile" action={
-              <div className="flex items-center gap-2">
-                <span className={`text-xs transition-all duration-300 ${saved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-                <button
-                  onClick={() => save(data!)}
-                  disabled={saving}
-                  className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-                >
-                  {saving ? "Saving…" : "Save"}
-                </button>
-              </div>
-            }>
+            <Section title="Profile" action={<AutosaveIndicator status={profileAutoStatus} />}>
               <div className="flex gap-4 items-start">
                 <AvatarUpload
                   avatarUrl={data.profile.avatarUrl}
@@ -444,7 +504,6 @@ export function AdminClient() {
                           },
                         };
                         setData(next);
-                        save(next);
                       }}
                       className={`relative flex flex-col items-center justify-center gap-1.5 rounded-xl p-3 h-20 text-xs font-medium transition-all hover:scale-[1.03] active:scale-[0.98] ${tpl.preview}`}
                     >
@@ -493,28 +552,7 @@ export function AdminClient() {
             {/* Featured Card section */}
             <Section
               title="Featured Card"
-              action={
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs transition-all duration-300 ${heroSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-                  <button
-                    onClick={async () => {
-                      setHeroSaving(true);
-                      await fetch("/api/admin/hero", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ heroEnabled, heroImageUrl, heroHeadline, heroSubtitle, heroCtaText, heroCtaUrl }),
-                      });
-                      setHeroSaving(false);
-                      setHeroSaved(true);
-                      setTimeout(() => setHeroSaved(false), 2000);
-                    }}
-                    disabled={heroSaving}
-                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-                  >
-                    {heroSaving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              }
+              action={<AutosaveIndicator status={heroAutoStatus} />}
             >
               <div className="flex flex-col gap-4">
                 {/* Enable toggle */}
@@ -785,28 +823,7 @@ export function AdminClient() {
             {/* Contact Form section */}
             <Section
               title="Contact Form"
-              action={
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs transition-all duration-300 ${contactFormSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-                  <button
-                    onClick={async () => {
-                      setContactFormSaving(true);
-                      await fetch("/api/admin/contact-form", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ contactFormEnabled, contactFormTitle, contactFormEmail, contactFormSmsNumber }),
-                      });
-                      setContactFormSaving(false);
-                      setContactFormSaved(true);
-                      setTimeout(() => setContactFormSaved(false), 2000);
-                    }}
-                    disabled={contactFormSaving}
-                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-                  >
-                    {contactFormSaving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              }
+              action={<AutosaveIndicator status={contactFormAutoStatus} />}
             >
               <div className="flex flex-col gap-4">
                 <div className="flex items-center justify-between">
@@ -865,35 +882,7 @@ export function AdminClient() {
             {/* Media Gallery section */}
             <Section
               title="Media Gallery"
-              action={
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs transition-all duration-300 ${gallerySaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-                  <button
-                    onClick={async () => {
-                      setGallerySaving(true);
-                      await Promise.all([
-                        fetch("/api/admin/gallery", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "settings", galleryEnabled, galleryTitle, galleryColumns }),
-                        }),
-                        fetch("/api/admin/gallery", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ action: "bulk", images: galleryImages }),
-                        }),
-                      ]);
-                      setGallerySaving(false);
-                      setGallerySaved(true);
-                      setTimeout(() => setGallerySaved(false), 2000);
-                    }}
-                    disabled={gallerySaving}
-                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-                  >
-                    {gallerySaving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              }
+              action={<AutosaveIndicator status={galleryAutoStatus} />}
             >
               <div className="flex flex-col gap-4">
                 {/* Enable toggle */}
@@ -1243,28 +1232,7 @@ export function AdminClient() {
             <AnalyticsTab links={data.links} />
             <Section
               title="Pixels"
-              action={
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs transition-all duration-300 ${pixelSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-                  <button
-                    onClick={async () => {
-                      setPixelSaving(true);
-                      await fetch("/api/admin/pixels", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ metaPixelId, tiktokPixelId, googleTagId }),
-                      });
-                      setPixelSaving(false);
-                      setPixelSaved(true);
-                      setTimeout(() => setPixelSaved(false), 2000);
-                    }}
-                    disabled={pixelSaving}
-                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-                  >
-                    {pixelSaving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              }
+              action={<AutosaveIndicator status={pixelAutoStatus} />}
             >
               <div className="flex flex-col gap-3">
                 <p className="text-xs text-black/40 dark:text-white/40">
@@ -1289,28 +1257,7 @@ export function AdminClient() {
             </Section>
             <Section
               title="Webhooks / Zapier"
-              action={
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs transition-all duration-300 ${webhookSaved ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-                  <button
-                    onClick={async () => {
-                      setWebhookSaving(true);
-                      await fetch("/api/admin/webhook", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ webhookUrl }),
-                      });
-                      setWebhookSaving(false);
-                      setWebhookSaved(true);
-                      setTimeout(() => setWebhookSaved(false), 2000);
-                    }}
-                    disabled={webhookSaving}
-                    className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-                  >
-                    {webhookSaving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              }
+              action={<AutosaveIndicator status={webhookAutoStatus} />}
             >
               <div className="flex flex-col gap-3">
                 <p className="text-xs text-black/40 dark:text-white/40">
@@ -1434,8 +1381,6 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [smsNumber, setSmsNumber] = useState(profile.bookingSmsNumber ?? "");
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [bookingsList, setBookingsList] = useState<BookingRecord[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState(false);
   const [loadingBookings, setLoadingBookings] = useState(true);
 
   useEffect(() => {
@@ -1462,8 +1407,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
     setWindows((prev) => prev.map((w) => w.dayOfWeek === dow ? { ...w, [field]: val } : w));
   };
 
-  const handleSave = async () => {
-    setSaving(true);
+  const bookingAutoStatus = useAutosave(async () => {
     await fetch("/api/admin/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1472,10 +1416,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
         windows,
       }),
     });
-    setSaving(false);
-    setSavedMsg(true);
-    setTimeout(() => setSavedMsg(false), 2000);
-  };
+  }, [enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows]);
 
   const cancelBooking = async (id: string) => {
     await fetch(`/api/admin/bookings/${id}`, {
@@ -1504,18 +1445,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       {/* Enable toggle */}
       <Section
         title="Booking"
-        action={
-          <div className="flex items-center gap-2">
-            <span className={`text-xs transition-all duration-300 ${savedMsg ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save"}
-            </button>
-          </div>
-        }
+        action={<AutosaveIndicator status={bookingAutoStatus} />}
       >
         <div className="flex flex-col gap-4">
           {/* Enable */}
@@ -1793,9 +1723,6 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
   const [prods, setProds] = useState<ProductRow[]>([]);
   const [loadingProds, setLoadingProds] = useState(true);
 
-  const [saving, setSaving] = useState(false);
-  const [savedMsg, setSavedMsg] = useState(false);
-
   useEffect(() => {
     fetch("/api/admin/products").then((r) => r.json()).then((d) => {
       setProds((d.products || []).map((p: ProductRow & { price: number }) => ({
@@ -1854,8 +1781,7 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
     setTimeout(() => setStripeSavedMsg(false), 2000);
   }
 
-  async function handleSave() {
-    setSaving(true);
+  const storeAutoStatus = useAutosave(async () => {
     await Promise.all([
       fetch("/api/admin/products", {
         method: "POST",
@@ -1875,10 +1801,7 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
         }),
       }),
     ]);
-    setSaving(false);
-    setSavedMsg(true);
-    setTimeout(() => setSavedMsg(false), 2000);
-  }
+  }, [prods, emailEnabled, emailTitle, emailButton, tipEnabled, tipTitle, tipAmounts]);
 
   function exportCSV() {
     const header = "email,name,subscribed_at\n";
@@ -1958,19 +1881,12 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
         title="Products"
         action={
           <div className="flex items-center gap-3">
-            <span className={`text-xs transition-all duration-300 ${savedMsg ? "text-emerald-500" : "opacity-0"}`}>Saved</span>
+            <AutosaveIndicator status={storeAutoStatus} />
             <button
               onClick={addProduct}
               className="flex items-center gap-1 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
             >
               <span className="text-base leading-none">+</span> Add product
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex h-7 items-center gap-1.5 rounded-lg bg-black dark:bg-white px-3 text-xs font-medium text-white dark:text-black transition-opacity disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         }
