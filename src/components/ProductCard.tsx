@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Product } from "@/data/links";
 import { CheckoutModal } from "./CheckoutModal";
+import { contrastText } from "@/lib/contrast";
 
 function formatPrice(cents: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -23,7 +24,7 @@ export function ProductCard({
 }) {
   const [showCheckout, setShowCheckout] = useState(false);
 
-  const accentStyle = accentColor ? { backgroundColor: accentColor } : {};
+  const accentStyle = accentColor ? { backgroundColor: accentColor, color: contrastText(accentColor) } : {};
 
   return (
     <>
@@ -56,11 +57,11 @@ export function ProductCard({
           </div>
           <button
             onClick={() => setShowCheckout(true)}
-            className="w-full h-9 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80 text-white"
+            className="w-full h-9 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
             style={
               accentColor
                 ? accentStyle
-                : { backgroundColor: "black" }
+                : { backgroundColor: "black", color: "white" }
             }
           >
             Buy {formatPrice(product.price, product.currency)}

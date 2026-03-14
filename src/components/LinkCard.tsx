@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Icon, ArrowRightIcon } from "./Icons";
 import type { Link } from "@/data/links";
+import { contrastText } from "@/lib/contrast";
 
 export type CardStyle = "minimal" | "solid" | "ghost" | "lift" | "sharp";
 export type CardSize = "sm" | "md" | "lg" | "xl";
@@ -119,7 +120,7 @@ export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md", 
 
   // For solid + accent: override card background with accent, force white text
   const cardAccentStyle = accentColor && isSolid
-    ? { backgroundColor: accentColor, color: "white" }
+    ? { backgroundColor: accentColor, color: contrastText(accentColor) }
     : undefined;
 
   // For sharp + accent: tint the left border

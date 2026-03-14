@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from "@stripe/react-stripe-js";
+import { contrastText } from "@/lib/contrast";
 
 export function TipJarWidget({
   username,
@@ -101,7 +102,7 @@ export function TipJarWidget({
             className="flex h-9 items-center rounded-xl px-4 text-sm font-medium transition-all"
             style={
               selected === amt && !custom
-                ? { backgroundColor: accent, color: "#fff", borderColor: accent, border: "1.5px solid" }
+                ? { backgroundColor: accent, color: contrastText(accent), borderColor: accent, border: "1.5px solid" }
                 : { border: "1.5px solid", borderColor: "rgba(0,0,0,0.1)", color: "inherit" }
             }
           >
@@ -129,7 +130,7 @@ export function TipJarWidget({
         onClick={startCheckout}
         disabled={loading || !finalAmount || finalAmount <= 0}
         className="flex h-10 items-center justify-center rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40"
-        style={{ backgroundColor: accent, color: "#fff" }}
+        style={{ backgroundColor: accent, color: contrastText(accent) }}
       >
         {loading ? "Loading..." : `Send $${finalAmount ?? "—"}`}
       </button>

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { contrastText } from "@/lib/contrast";
 
 export function HeroCard({
   imageUrl,
@@ -16,7 +17,7 @@ export function HeroCard({
   accentColor?: string;
 }) {
   const ctaStyle = accentColor
-    ? { backgroundColor: accentColor, color: "#fff" }
+    ? { backgroundColor: accentColor, color: contrastText(accentColor) }
     : { backgroundColor: "black", color: "white" };
 
   const inner = (

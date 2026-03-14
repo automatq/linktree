@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { contrastText } from "@/lib/contrast";
 
 export function EmailCaptureWidget({
   username,
@@ -42,8 +43,8 @@ export function EmailCaptureWidget({
   }
 
   const btnStyle = accentColor
-    ? { backgroundColor: accentColor }
-    : { backgroundColor: "black" };
+    ? { backgroundColor: accentColor, color: contrastText(accentColor) }
+    : { backgroundColor: "black", color: "white" };
 
   if (status === "success") {
     return (
@@ -84,7 +85,7 @@ export function EmailCaptureWidget({
         <button
           type="submit"
           disabled={status === "loading"}
-          className="h-9 w-full rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-80 disabled:opacity-50"
+          className="h-9 w-full rounded-lg text-sm font-semibold transition-opacity hover:opacity-80 disabled:opacity-50"
           style={btnStyle}
         >
           {status === "loading" ? "Subscribing…" : buttonText}

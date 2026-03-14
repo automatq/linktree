@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { contrastText } from "@/lib/contrast";
 
 export function ContactFormWidget({
   username,
@@ -107,7 +108,7 @@ export function ContactFormWidget({
           type="submit"
           disabled={sending || !name.trim() || !email.trim() || !message.trim()}
           className={`h-9 rounded-lg text-xs font-medium transition-all disabled:opacity-50 ${accentColor ? "" : "bg-black dark:bg-white text-white dark:text-black"}`}
-          style={accentColor ? { backgroundColor: accentColor, color: "#fff" } : undefined}
+          style={accentColor ? { backgroundColor: accentColor, color: contrastText(accentColor) } : undefined}
         >
           {sending ? "Sending…" : "Send message"}
         </button>
