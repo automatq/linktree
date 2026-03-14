@@ -204,20 +204,17 @@ export function WallCanvas({
                 <div className="flex items-center justify-between mt-auto pt-1">
                   <Link
                     href={`/${note.authorUsername}`}
-                    className="flex items-center gap-1.5 min-w-0 group"
+                    title={`@${note.authorUsername}`}
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="h-4 w-4 rounded-full bg-black/10 flex items-center justify-center overflow-hidden shrink-0">
+                    <div className="h-5 w-5 rounded-full bg-black/10 flex items-center justify-center overflow-hidden shrink-0 hover:ring-2 hover:ring-black/20 transition-all">
                       {note.authorAvatarUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={note.authorAvatarUrl} alt="" className="h-full w-full object-cover" />
+                        <img src={note.authorAvatarUrl} alt={`@${note.authorUsername}`} className="h-full w-full object-cover" />
                       ) : (
-                        <span className="text-[6px] font-bold opacity-50">{note.authorAvatarInitials || "?"}</span>
+                        <span className="text-[7px] font-bold opacity-50">{note.authorAvatarInitials || "?"}</span>
                       )}
                     </div>
-                    <span className="text-[10px] font-medium opacity-60 truncate group-hover:opacity-90 transition-opacity">
-                      @{note.authorUsername}
-                    </span>
                   </Link>
                   <span className="text-[9px] opacity-40 shrink-0">
                     {timeAgo(note.createdAt)}
