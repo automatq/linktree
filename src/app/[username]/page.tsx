@@ -24,6 +24,7 @@ import { MediaGallery } from "@/components/MediaGallery";
 import { ContactFormWidget } from "@/components/ContactFormWidget";
 import { GroupShowcase } from "@/components/GroupShowcase";
 import { WallCanvas } from "@/components/WallCanvas";
+import { VoiceRooms } from "@/components/VoiceRoom";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
@@ -373,6 +374,13 @@ export default async function ProfilePage({
               columns={profile.galleryColumns ?? 3}
               accentColor={accentColor}
             />
+          </section>
+        )}
+
+        {/* Voice Rooms */}
+        {profile.voiceRoomsEnabled && (
+          <section className="w-full mt-4 flex flex-col gap-4">
+            <VoiceRooms username={profile.username} accentColor={accentColor} />
           </section>
         )}
 

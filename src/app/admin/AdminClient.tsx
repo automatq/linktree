@@ -94,6 +94,8 @@ export function AdminClient() {
   const [contactFormTitle, setContactFormTitle] = useState("Get in touch");
   const [contactFormEmail, setContactFormEmail] = useState("");
   const [contactFormSmsNumber, setContactFormSmsNumber] = useState("");
+  const [voiceRoomsEnabled, setVoiceRoomsEnabled] = useState(false);
+  const [voiceRoomsList, setVoiceRoomsList] = useState<Array<{ id: string; prompt: string; active: boolean; notes: Array<{ id: string; authorName: string; duration: number }> }>>([]);
   const [wallEnabled, setWallEnabled] = useState(false);
   const [wallTitle, setWallTitle] = useState("The Wall");
   const [wallMaxNotes, setWallMaxNotes] = useState(50);
@@ -149,6 +151,11 @@ export function AdminClient() {
       // Load gallery images
       fetch("/api/admin/gallery").then((r) => r.json()).then((g) => {
         if (g.images) setGalleryImages(g.images);
+      });
+      // Load voice rooms
+      fetch("/api/admin/voice-rooms").then((r) => r.json()).then((v) => {
+        setVoiceRoomsEnabled(v.voiceRoomsEnabled ?? false);
+        setVoiceRoomsList(v.rooms || []);
       });
       // Load wall data
       fetch("/api/admin/wall").then((r) => r.json()).then((w) => {
@@ -208,6 +215,14 @@ export function AdminClient() {
       }),
     ]);
   }, [gallerySettingsKey]);
+
+  const voiceRoomsAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/voice-rooms", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "settings", voiceRoomsEnabled }),
+    });
+  }, [voiceRoomsEnabled]);
 
   const wallAutoStatus = useAutosave(async () => {
     await fetch("/api/admin/wall", {
@@ -986,6 +1001,104 @@ export function AdminClient() {
                         </div>
                       )}
                     </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Voice Rooms section */}
+            <Section
+              title="Voice Rooms"
+              action={<AutosaveIndicator status={voiceRoomsAutoStatus} />}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Enable Voice Rooms</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Set a prompt — visitors respond with short voice notes</p>
+                  </div>
+                  <button
+                    onClick={() => setVoiceRoomsEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${voiceRoomsEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${voiceRoomsEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {voiceRoomsEnabled && (
+                  <div className="flex flex-col gap-3">
+                    {/* Existing rooms */}
+                    {voiceRoomsList.map((room) => (
+                      <div key={room.id} className="flex flex-col gap-2 p-3 rounded-lg border border-black/5 dark:border-white/5">
+                        <div className="flex items-start gap-2">
+                          <input
+                            value={room.prompt}
+                            onChange={(e) => {
+                              setVoiceRoomsList((prev) => prev.map((r) => r.id === room.id ? { ...r, prompt: e.target.value } : r));
+                            }}
+                            onBlur={() => {
+                              fetch("/api/admin/voice-rooms", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "update", roomId: room.id, prompt: room.prompt, active: room.active }),
+                              });
+                            }}
+                            className="h-8 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                            placeholder="Your prompt or question…"
+                          />
+                          <button
+                            onClick={() => {
+                              const next = !room.active;
+                              setVoiceRoomsList((prev) => prev.map((r) => r.id === room.id ? { ...r, active: next } : r));
+                              fetch("/api/admin/voice-rooms", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "update", roomId: room.id, prompt: room.prompt, active: next }),
+                              });
+                            }}
+                            className={`shrink-0 h-8 px-2 rounded-md border text-[10px] font-medium transition-colors ${room.active ? "border-emerald-200 text-emerald-600 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:bg-emerald-900/20" : "border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"}`}
+                          >
+                            {room.active ? "Active" : "Paused"}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-black/30 dark:text-white/30">
+                            {room.notes.length} {room.notes.length === 1 ? "response" : "responses"}
+                          </span>
+                          <button
+                            onClick={async () => {
+                              await fetch("/api/admin/voice-rooms", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "delete", roomId: room.id }),
+                              });
+                              setVoiceRoomsList((prev) => prev.filter((r) => r.id !== room.id));
+                            }}
+                            className="text-[10px] text-red-400 hover:text-red-500 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Add room */}
+                    <button
+                      onClick={async () => {
+                        const res = await fetch("/api/admin/voice-rooms", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "create", prompt: "What's on your mind?" }),
+                        });
+                        const d = await res.json();
+                        if (d.id) {
+                          setVoiceRoomsList((prev) => [...prev, { id: d.id, prompt: "What's on your mind?", active: true, notes: [] }]);
+                        }
+                      }}
+                      className="h-8 w-full rounded-md border border-dashed border-black/15 dark:border-white/15 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+                    >
+                      + Add prompt
+                    </button>
                   </div>
                 )}
               </div>

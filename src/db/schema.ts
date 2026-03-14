@@ -65,6 +65,8 @@ export const profiles = pgTable("profiles", {
   wallEnabled: boolean("wall_enabled").notNull().default(false),
   wallTitle: text("wall_title").notNull().default("The Wall"),
   wallMaxNotes: integer("wall_max_notes").notNull().default(50),
+  // Voice Rooms
+  voiceRoomsEnabled: boolean("voice_rooms_enabled").notNull().default(false),
   usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
@@ -238,6 +240,31 @@ export const wallNotes = pgTable("wall_notes", {
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
   index("wall_notes_profile_id_idx").on(t.profileId),
+]);
+
+// Voice Rooms — async voice note discussions
+export const voiceRooms = pgTable("voice_rooms", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  prompt: text("prompt").notNull(),
+  active: boolean("active").notNull().default(true),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("voice_rooms_profile_id_idx").on(t.profileId),
+]);
+
+// Voice Notes — audio responses to a room prompt
+export const voiceNotes = pgTable("voice_notes", {
+  id: text("id").primaryKey(),
+  roomId: text("room_id").notNull().references(() => voiceRooms.id, { onDelete: "cascade" }),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  authorName: text("author_name").notNull().default(""),
+  audioUrl: text("audio_url").notNull(),
+  duration: integer("duration").notNull().default(0), // seconds
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("voice_notes_room_id_idx").on(t.roomId),
 ]);
 
 // Individual bookings
