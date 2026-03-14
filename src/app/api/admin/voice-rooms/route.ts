@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { profiles, voiceRooms, voiceNotes } from "@/db/schema";
 import { eq, asc, and, desc } from "drizzle-orm";
 
+const authorProfiles = profiles;
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,16 +23,23 @@ export async function GET() {
   const roomsWithNotes = await Promise.all(
     rooms.map(async (room) => {
       const notes = await db
-        .select()
+        .select({
+          id: voiceNotes.id,
+          audioUrl: voiceNotes.audioUrl,
+          duration: voiceNotes.duration,
+          createdAt: voiceNotes.createdAt,
+          authorUsername: authorProfiles.username,
+          authorName: authorProfiles.name,
+        })
         .from(voiceNotes)
+        .innerJoin(authorProfiles, eq(voiceNotes.authorProfileId, authorProfiles.id))
         .where(eq(voiceNotes.roomId, room.id))
         .orderBy(desc(voiceNotes.createdAt));
       return {
         ...room,
         notes: notes.map((n) => ({
           id: n.id,
-          authorName: n.authorName,
-          audioUrl: n.audioUrl,
+          authorUsername: n.authorUsername,
           duration: n.duration,
           createdAt: n.createdAt?.toISOString(),
         })),

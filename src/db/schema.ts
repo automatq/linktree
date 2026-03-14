@@ -233,7 +233,7 @@ export const groupMembers = pgTable("group_members", {
 export const wallNotes = pgTable("wall_notes", {
   id: text("id").primaryKey(),
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  authorName: text("author_name").notNull().default(""),
+  authorProfileId: integer("author_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   message: text("message").notNull(),
   color: text("color").notNull().default("yellow"), // yellow, blue, green, pink, purple
   rotation: integer("rotation").notNull().default(0), // degrees -6 to 6
@@ -259,7 +259,7 @@ export const voiceNotes = pgTable("voice_notes", {
   id: text("id").primaryKey(),
   roomId: text("room_id").notNull().references(() => voiceRooms.id, { onDelete: "cascade" }),
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  authorName: text("author_name").notNull().default(""),
+  authorProfileId: integer("author_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   audioUrl: text("audio_url").notNull(),
   duration: integer("duration").notNull().default(0), // seconds
   createdAt: timestamp("created_at").defaultNow(),

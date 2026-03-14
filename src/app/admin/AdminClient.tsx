@@ -95,11 +95,11 @@ export function AdminClient() {
   const [contactFormEmail, setContactFormEmail] = useState("");
   const [contactFormSmsNumber, setContactFormSmsNumber] = useState("");
   const [voiceRoomsEnabled, setVoiceRoomsEnabled] = useState(false);
-  const [voiceRoomsList, setVoiceRoomsList] = useState<Array<{ id: string; prompt: string; active: boolean; notes: Array<{ id: string; authorName: string; duration: number }> }>>([]);
+  const [voiceRoomsList, setVoiceRoomsList] = useState<Array<{ id: string; prompt: string; active: boolean; notes: Array<{ id: string; authorUsername: string; duration: number }> }>>([]);
   const [wallEnabled, setWallEnabled] = useState(false);
   const [wallTitle, setWallTitle] = useState("The Wall");
   const [wallMaxNotes, setWallMaxNotes] = useState(50);
-  const [wallNotes, setWallNotes] = useState<Array<{ id: string; authorName: string; message: string; color: string; createdAt: string }>>([]);
+  const [wallNotes, setWallNotes] = useState<Array<{ id: string; authorUsername: string; authorName: string; message: string; color: string; createdAt: string }>>([]);
   const [showUsernameChange, setShowUsernameChange] = useState(false);
   const { signOut } = useClerk();
 
@@ -979,7 +979,7 @@ export function AdminClient() {
                           {wallNotes.map((note) => (
                             <div key={note.id} className="flex items-start gap-2 p-2 rounded-lg border border-black/5 dark:border-white/5 text-xs">
                               <div className="flex-1 min-w-0">
-                                <span className="font-medium text-black dark:text-white">{note.authorName || "Anonymous"}</span>
+                                <span className="font-medium text-black dark:text-white">@{note.authorUsername}</span>
                                 <span className="text-black/30 dark:text-white/30"> · </span>
                                 <span className="text-black/50 dark:text-white/50">{note.message}</span>
                               </div>

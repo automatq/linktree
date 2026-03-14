@@ -4,6 +4,8 @@ import { db } from "@/db";
 import { profiles, wallNotes } from "@/db/schema";
 import { eq, desc, and } from "drizzle-orm";
 
+const authorProfiles = profiles;
+
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -12,8 +14,17 @@ export async function GET() {
   if (!profile) return NextResponse.json({ notes: [], wallEnabled: false });
 
   const notes = await db
-    .select()
+    .select({
+      id: wallNotes.id,
+      message: wallNotes.message,
+      color: wallNotes.color,
+      rotation: wallNotes.rotation,
+      createdAt: wallNotes.createdAt,
+      authorUsername: authorProfiles.username,
+      authorName: authorProfiles.name,
+    })
     .from(wallNotes)
+    .innerJoin(authorProfiles, eq(wallNotes.authorProfileId, authorProfiles.id))
     .where(eq(wallNotes.profileId, profile.id))
     .orderBy(desc(wallNotes.createdAt))
     .limit(200);
@@ -21,10 +32,10 @@ export async function GET() {
   return NextResponse.json({
     notes: notes.map((n) => ({
       id: n.id,
+      authorUsername: n.authorUsername,
       authorName: n.authorName,
       message: n.message,
       color: n.color,
-      rotation: n.rotation,
       createdAt: n.createdAt?.toISOString(),
     })),
     wallEnabled: profile.wallEnabled,
@@ -43,7 +54,6 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { action } = body;
 
-  // Update wall settings
   if (action === "settings") {
     await db.update(profiles).set({
       wallEnabled: body.wallEnabled,
@@ -53,7 +63,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Delete a note (moderation)
   if (action === "delete") {
     await db
       .delete(wallNotes)
@@ -61,7 +70,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // Clear all notes
   if (action === "clear") {
     await db.delete(wallNotes).where(eq(wallNotes.profileId, profile.id));
     return NextResponse.json({ ok: true });

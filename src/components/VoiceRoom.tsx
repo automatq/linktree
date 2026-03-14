@@ -1,13 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useUser } from "@clerk/nextjs";
+import Link from "next/link";
 
 type VoiceNote = {
   id: string;
-  authorName: string;
   audioUrl: string;
   duration: number;
   createdAt: string;
+  authorUsername: string;
+  authorName: string;
+  authorAvatarUrl: string;
+  authorAvatarInitials: string;
 };
 
 type Room = {
@@ -97,9 +102,19 @@ function AudioPlayer({ note, accentColor }: { note: VoiceNote; accentColor?: str
       {/* Progress + info */}
       <div className="flex-1 min-w-0 flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-black dark:text-white truncate">
-            {note.authorName || "Anonymous"}
-          </span>
+          <Link href={`/${note.authorUsername}`} className="flex items-center gap-1.5 min-w-0 group">
+            <div className="h-5 w-5 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
+              {note.authorAvatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={note.authorAvatarUrl} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-[7px] font-bold text-black/30 dark:text-white/30">{note.authorAvatarInitials || "?"}</span>
+              )}
+            </div>
+            <span className="text-xs font-medium text-black dark:text-white truncate group-hover:underline">
+              @{note.authorUsername}
+            </span>
+          </Link>
           <span className="text-[10px] text-black/30 dark:text-white/30 shrink-0 ml-2">
             {timeAgo(note.createdAt)}
           </span>
@@ -137,7 +152,6 @@ function VoiceRecorder({
   onRecorded: (note: VoiceNote) => void;
   onCancel: () => void;
 }) {
-  const [authorName, setAuthorName] = useState("");
   const [recording, setRecording] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -202,7 +216,6 @@ function VoiceRecorder({
       const form = new FormData();
       form.append("audio", audioBlob, "voice-note.webm");
       form.append("roomId", roomId);
-      form.append("authorName", authorName);
       form.append("duration", String(elapsed));
 
       const res = await fetch(`/api/voice/${username}`, { method: "POST", body: form });
@@ -216,7 +229,6 @@ function VoiceRecorder({
     }
   }
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       clearInterval(timer.current);
@@ -226,21 +238,11 @@ function VoiceRecorder({
 
   return (
     <div className="rounded-xl border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex flex-col gap-3">
-      <input
-        type="text"
-        placeholder="Your name (optional)"
-        value={authorName}
-        onChange={(e) => setAuthorName(e.target.value)}
-        maxLength={30}
-        className="h-8 w-full rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 text-sm text-black dark:text-white placeholder-black/25 dark:placeholder-white/25 outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
-      />
-
       {/* Recording controls */}
       {!audioBlob ? (
         <div className="flex items-center gap-3">
           {recording ? (
             <>
-              {/* Pulsing indicator */}
               <div className="flex items-center gap-2">
                 <span className="relative flex h-3 w-3">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
@@ -275,7 +277,6 @@ function VoiceRecorder({
           )}
         </div>
       ) : (
-        /* Review recorded audio */
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <span className="text-sm font-mono text-black dark:text-white">{formatDuration(elapsed)}</span>
@@ -321,6 +322,7 @@ export function VoiceRooms({
   username: string;
   accentColor?: string;
 }) {
+  const { isSignedIn } = useUser();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [recordingRoom, setRecordingRoom] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -361,13 +363,22 @@ export function VoiceRooms({
                 {room.notes.length} {room.notes.length === 1 ? "response" : "responses"}
               </span>
               {recordingRoom !== room.id && (
-                <button
-                  onClick={() => setRecordingRoom(room.id)}
-                  className="text-[11px] font-medium transition-colors hover:opacity-80"
-                  style={{ color: accentColor || undefined }}
-                >
-                  + Drop a voice note
-                </button>
+                isSignedIn ? (
+                  <button
+                    onClick={() => setRecordingRoom(room.id)}
+                    className="text-[11px] font-medium transition-colors hover:opacity-80"
+                    style={{ color: accentColor || undefined }}
+                  >
+                    + Drop a voice note
+                  </button>
+                ) : (
+                  <Link
+                    href="/sign-in"
+                    className="text-[11px] font-medium text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                  >
+                    Sign in to respond
+                  </Link>
+                )
               )}
             </div>
           </div>

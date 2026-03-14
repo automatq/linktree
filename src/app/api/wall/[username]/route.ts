@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { profiles, wallNotes } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { isRateLimited } from "@/lib/rate-limit";
 
 const NOTE_COLORS = ["yellow", "blue", "green", "pink", "purple"];
+
+// Alias for self-referencing join
+const authorProfiles = profiles;
 
 export async function GET(
   _req: NextRequest,
@@ -19,8 +23,19 @@ export async function GET(
   }
 
   const notes = await db
-    .select()
+    .select({
+      id: wallNotes.id,
+      message: wallNotes.message,
+      color: wallNotes.color,
+      rotation: wallNotes.rotation,
+      createdAt: wallNotes.createdAt,
+      authorUsername: authorProfiles.username,
+      authorName: authorProfiles.name,
+      authorAvatarUrl: authorProfiles.avatarUrl,
+      authorAvatarInitials: authorProfiles.avatarInitials,
+    })
     .from(wallNotes)
+    .innerJoin(authorProfiles, eq(wallNotes.authorProfileId, authorProfiles.id))
     .where(eq(wallNotes.profileId, profile.id))
     .orderBy(desc(wallNotes.createdAt))
     .limit(profile.wallMaxNotes);
@@ -28,11 +43,14 @@ export async function GET(
   return NextResponse.json({
     notes: notes.map((n) => ({
       id: n.id,
-      authorName: n.authorName,
       message: n.message,
       color: n.color,
       rotation: n.rotation,
       createdAt: n.createdAt?.toISOString(),
+      authorUsername: n.authorUsername,
+      authorName: n.authorName,
+      authorAvatarUrl: n.authorAvatarUrl,
+      authorAvatarInitials: n.authorAvatarInitials,
     })),
     title: profile.wallTitle,
   });
@@ -43,9 +61,21 @@ export async function POST(
   { params }: { params: Promise<{ username: string }> },
 ) {
   const { username } = await params;
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
 
-  // Rate limit: 3 notes per 5 minutes per IP
+  // Require authentication
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "You must be signed in to post" }, { status: 401 });
+  }
+
+  const authorProfile = await db.query.profiles.findFirst({
+    where: eq(profiles.userId, userId),
+  });
+  if (!authorProfile) {
+    return NextResponse.json({ error: "You need a profile to post" }, { status: 403 });
+  }
+
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0] ?? "unknown";
   if (isRateLimited(`wall:${ip}`, 3, 5 * 60 * 1000)) {
     return NextResponse.json({ error: "Slow down — try again in a few minutes" }, { status: 429 });
   }
@@ -59,21 +89,19 @@ export async function POST(
 
   const body = await req.json();
   const message = (body.message || "").trim().slice(0, 120);
-  const authorName = (body.authorName || "").trim().slice(0, 30);
   const color = NOTE_COLORS.includes(body.color) ? body.color : "yellow";
 
   if (!message) {
     return NextResponse.json({ error: "Message required" }, { status: 400 });
   }
 
-  // Random slight rotation for organic feel
-  const rotation = Math.floor(Math.random() * 13) - 6; // -6 to 6 degrees
+  const rotation = Math.floor(Math.random() * 13) - 6;
 
   const id = crypto.randomUUID();
   await db.insert(wallNotes).values({
     id,
     profileId: profile.id,
-    authorName,
+    authorProfileId: authorProfile.id,
     message,
     color,
     rotation,
@@ -95,6 +123,16 @@ export async function POST(
 
   return NextResponse.json({
     ok: true,
-    note: { id, authorName, message, color, rotation, createdAt: new Date().toISOString() },
+    note: {
+      id,
+      message,
+      color,
+      rotation,
+      createdAt: new Date().toISOString(),
+      authorUsername: authorProfile.username,
+      authorName: authorProfile.name,
+      authorAvatarUrl: authorProfile.avatarUrl,
+      authorAvatarInitials: authorProfile.avatarInitials,
+    },
   });
 }

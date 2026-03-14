@@ -1,14 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useUser } from "@clerk/nextjs";
+import Link from "next/link";
 
 type WallNote = {
   id: string;
-  authorName: string;
   message: string;
   color: string;
   rotation: number;
   createdAt: string;
+  authorUsername: string;
+  authorName: string;
+  authorAvatarUrl: string;
+  authorAvatarInitials: string;
 };
 
 const COLOR_MAP: Record<string, { bg: string; border: string; text: string; shadow: string }> = {
@@ -42,9 +47,9 @@ export function WallCanvas({
   title: string;
   accentColor?: string;
 }) {
+  const { isSignedIn } = useUser();
   const [notes, setNotes] = useState<WallNote[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [authorName, setAuthorName] = useState("");
   const [message, setMessage] = useState("");
   const [selectedColor, setSelectedColor] = useState("yellow");
   const [sending, setSending] = useState(false);
@@ -67,13 +72,12 @@ export function WallCanvas({
       const res = await fetch(`/api/wall/${username}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message, authorName, color: selectedColor }),
+        body: JSON.stringify({ message, color: selectedColor }),
       });
       const d = await res.json();
       if (!res.ok) { setError(d.error || "Something went wrong"); return; }
       setNotes((prev) => [d.note, ...prev]);
       setMessage("");
-      setAuthorName("");
       setShowForm(false);
       setJustPosted(true);
       setTimeout(() => setJustPosted(false), 3000);
@@ -95,13 +99,22 @@ export function WallCanvas({
           <div className="h-px flex-1 bg-black/8 dark:bg-white/8" />
         </div>
         {!showForm && !justPosted && (
-          <button
-            onClick={() => { setShowForm(true); setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 100); }}
-            className="shrink-0 ml-3 h-7 px-3 rounded-lg text-[11px] font-medium transition-all hover:opacity-80"
-            style={accentColor ? { backgroundColor: accentColor + "18", color: accentColor } : undefined}
-          >
-            + Leave a note
-          </button>
+          isSignedIn ? (
+            <button
+              onClick={() => { setShowForm(true); setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 100); }}
+              className="shrink-0 ml-3 h-7 px-3 rounded-lg text-[11px] font-medium transition-all hover:opacity-80"
+              style={accentColor ? { backgroundColor: accentColor + "18", color: accentColor } : undefined}
+            >
+              + Leave a note
+            </button>
+          ) : (
+            <Link
+              href="/sign-in"
+              className="shrink-0 ml-3 h-7 px-3 rounded-lg text-[11px] font-medium text-black/40 dark:text-white/40 border border-black/10 dark:border-white/10 flex items-center hover:text-black dark:hover:text-white transition-colors"
+            >
+              Sign in to post
+            </Link>
+          )
         )}
         {justPosted && (
           <span className="shrink-0 ml-3 text-[11px] text-emerald-500 font-medium">Posted!</span>
@@ -115,14 +128,6 @@ export function WallCanvas({
           className="rounded-xl border border-black/8 dark:border-white/8 bg-black/[0.02] dark:bg-white/[0.02] p-4 flex flex-col gap-3"
         >
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <input
-              type="text"
-              placeholder="Your name (optional)"
-              value={authorName}
-              onChange={(e) => setAuthorName(e.target.value)}
-              maxLength={30}
-              className="h-8 w-full rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 text-sm text-black dark:text-white placeholder-black/25 dark:placeholder-white/25 outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
-            />
             <textarea
               placeholder="Write something on the wall..."
               value={message}
@@ -130,6 +135,7 @@ export function WallCanvas({
               maxLength={120}
               rows={2}
               required
+              autoFocus
               className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 py-2 text-sm text-black dark:text-white placeholder-black/25 dark:placeholder-white/25 outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors resize-none"
             />
             {/* Color picker */}
@@ -196,9 +202,23 @@ export function WallCanvas({
                   {note.message}
                 </p>
                 <div className="flex items-center justify-between mt-auto pt-1">
-                  <span className="text-[10px] font-medium opacity-60 truncate">
-                    {note.authorName || "Anonymous"}
-                  </span>
+                  <Link
+                    href={`/${note.authorUsername}`}
+                    className="flex items-center gap-1.5 min-w-0 group"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="h-4 w-4 rounded-full bg-black/10 flex items-center justify-center overflow-hidden shrink-0">
+                      {note.authorAvatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={note.authorAvatarUrl} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <span className="text-[6px] font-bold opacity-50">{note.authorAvatarInitials || "?"}</span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-medium opacity-60 truncate group-hover:opacity-90 transition-opacity">
+                      @{note.authorUsername}
+                    </span>
+                  </Link>
                   <span className="text-[9px] opacity-40 shrink-0">
                     {timeAgo(note.createdAt)}
                   </span>
