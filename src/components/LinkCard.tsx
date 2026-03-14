@@ -168,11 +168,11 @@ export function LinkCard({ link, index, cardStyle = "minimal", cardSize = "md", 
           </span>
         )}
         <div className="flex min-w-0 flex-1 flex-col">
-          <span className={`truncate font-medium ${z.title} ${s.title}`}>
+          <span className={`font-medium ${z.title} ${s.title} break-words`}>
             {link.title}
           </span>
           {link.description && (
-            <span className={`truncate mt-0.5 ${z.desc} ${s.desc}`}>
+            <span className={`mt-0.5 ${z.desc} ${s.desc} break-words`}>
               {link.description}
             </span>
           )}
