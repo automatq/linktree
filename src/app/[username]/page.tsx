@@ -194,7 +194,7 @@ export default async function ProfilePage({
   const fontFamily = fontMap[profile.font ?? "mono"] ?? fontMap.mono;
 
   return (
-    <div className="min-h-screen transition-colors duration-200" style={{ fontFamily }}>
+    <div className="min-h-dvh transition-colors duration-200" style={{ fontFamily }}>
       <PixelScripts
         metaPixelId={profile.metaPixelId || undefined}
         tiktokPixelId={profile.tiktokPixelId || undefined}
@@ -250,7 +250,7 @@ export default async function ProfilePage({
         <ThemeToggle />
       </div>
 
-      <main className="relative mx-auto flex min-h-screen max-w-md flex-col items-center px-4 py-16">
+      <main className="relative mx-auto flex min-h-dvh max-w-md flex-col items-center px-4 py-16">
         <section className={`animate-fade-in-up mb-8 flex flex-col items-center ${ps.gap} text-center`}>
           <Avatar initials={profile.avatarInitials} avatarUrl={profile.avatarUrl || undefined} size={ps.avatarSize} accentColor={accentColor} />
           <div>

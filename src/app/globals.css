@@ -2,18 +2,25 @@
 
 @variant dark (&:where(.dark, .dark *));
 
+html {
+  background-color: #ffffff;
+}
+
 html.dark {
   color-scheme: dark;
+  background-color: #000000;
 }
 
 html.light {
   color-scheme: light;
+  background-color: #ffffff;
 }
 
 body {
   font-family: var(--font-geist-mono), "Courier New", monospace;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  min-height: 100dvh;
 }
 
 @keyframes fadeInUp {
@@ -30,4 +37,9 @@ body {
 .animate-fade-in-up {
   animation: fadeInUp 0.35s ease forwards;
   opacity: 0;
+}
+
+/* Use dynamic viewport height on mobile to avoid white flash behind browser chrome */
+.min-h-dvh {
+  min-height: 100dvh;
 }
