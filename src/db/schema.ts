@@ -59,6 +59,8 @@ export const profiles = pgTable("profiles", {
   galleryEnabled: boolean("gallery_enabled").notNull().default(false),
   galleryTitle: text("gallery_title").notNull().default("Gallery"),
   galleryColumns: integer("gallery_columns").notNull().default(3),
+  // Groups
+  groupsEnabled: boolean("groups_enabled").notNull().default(false),
   usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
@@ -196,6 +198,28 @@ export const subscribers = pgTable("subscribers", {
 }, (t) => [
   index("subscribers_profile_id_idx").on(t.profileId),
   index("subscribers_profile_email_idx").on(t.profileId, t.email),
+]);
+
+// Groups — showcase other creators on your profile
+export const groups = pgTable("groups", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  name: text("name").notNull().default("My Crew"),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("groups_profile_id_idx").on(t.profileId),
+]);
+
+// Group members — other profiles added to a group
+export const groupMembers = pgTable("group_members", {
+  id: text("id").primaryKey(),
+  groupId: text("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
+  memberProfileId: integer("member_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("group_members_group_id_idx").on(t.groupId),
 ]);
 
 // Individual bookings

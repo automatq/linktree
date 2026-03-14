@@ -70,7 +70,7 @@ export function AdminClient() {
   const [domainStatusMsg, setDomainStatusMsg] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store">("content");
+  const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store" | "groups">("content");
   const [showQR, setShowQR] = useState(false);
   const [metaPixelId, setMetaPixelId] = useState("");
   const [tiktokPixelId, setTiktokPixelId] = useState("");
@@ -410,7 +410,7 @@ export function AdminClient() {
           </div>
           {/* Bottom row: tab nav */}
           <nav className="flex gap-1 pb-2 -mx-1 overflow-x-auto scrollbar-none">
-            {(["content", "analytics", "booking", "store"] as const).map((t) => (
+            {(["content", "analytics", "booking", "store", "groups"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -1326,6 +1326,10 @@ export function AdminClient() {
           <StoreTab profile={data.profile} username={username ?? ""} />
         )}
 
+        {tab === "groups" && data.profile && (
+          <GroupsTab profile={data.profile} />
+        )}
+
       </main>
 
       {showQR && username && (
@@ -2136,6 +2140,300 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
           </div>
         )}
       </Section>
+    </div>
+  );
+}
+
+// ── Groups Tab ──────────────────────────────────────────────────────────────
+
+type GroupMember = {
+  id: string;
+  position: number;
+  profileId: number;
+  username: string;
+  name: string;
+  avatarUrl: string;
+  avatarInitials: string;
+  bio: string;
+};
+
+type Group = {
+  id: string;
+  name: string;
+  position: number;
+  members: GroupMember[];
+};
+
+type SearchResult = {
+  id: number;
+  username: string;
+  name: string;
+  avatarUrl: string;
+  avatarInitials: string;
+};
+
+function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
+  const [enabled, setEnabled] = useState(profile.groupsEnabled ?? false);
+  const [groupsList, setGroupsList] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [addingToGroup, setAddingToGroup] = useState<string | null>(null); // groupId currently adding to
+  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  useEffect(() => {
+    fetch("/api/admin/groups").then((r) => r.json()).then((d) => {
+      setGroupsList(d.groups || []);
+      setEnabled(d.groupsEnabled ?? false);
+      setLoading(false);
+    });
+  }, []);
+
+  // Autosave enabled toggle
+  const enabledAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "settings", groupsEnabled: enabled }),
+    });
+  }, [enabled]);
+
+  function handleSearch(query: string) {
+    setSearchQuery(query);
+    clearTimeout(searchTimer.current);
+    if (query.replace(/^@/, "").trim().length < 2) {
+      setSearchResults([]);
+      return;
+    }
+    searchTimer.current = setTimeout(async () => {
+      setSearching(true);
+      const res = await fetch("/api/admin/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "search", query }),
+      });
+      const d = await res.json();
+      setSearchResults(d.results || []);
+      setSearching(false);
+    }, 300);
+  }
+
+  async function createGroup() {
+    const res = await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create", name: "My Crew" }),
+    });
+    const d = await res.json();
+    if (d.id) {
+      setGroupsList((prev) => [...prev, { id: d.id, name: "My Crew", position: prev.length, members: [] }]);
+    }
+  }
+
+  async function deleteGroup(groupId: string) {
+    await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", groupId }),
+    });
+    setGroupsList((prev) => prev.filter((g) => g.id !== groupId));
+  }
+
+  async function updateGroupName(groupId: string, name: string) {
+    setGroupsList((prev) => prev.map((g) => g.id === groupId ? { ...g, name } : g));
+    await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", groupId, name }),
+    });
+  }
+
+  async function addMember(groupId: string, memberProfileId: number) {
+    const res = await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "addMember", groupId, memberProfileId }),
+    });
+    const d = await res.json();
+    if (d.error) {
+      alert(d.error);
+      return;
+    }
+    // Re-fetch to get fresh data with member profile info
+    const fresh = await fetch("/api/admin/groups").then((r) => r.json());
+    setGroupsList(fresh.groups || []);
+    setSearchQuery("");
+    setSearchResults([]);
+    setAddingToGroup(null);
+  }
+
+  async function removeMember(groupId: string, memberId: string) {
+    await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "removeMember", groupId, memberId }),
+    });
+    setGroupsList((prev) =>
+      prev.map((g) =>
+        g.id === groupId ? { ...g, members: g.members.filter((m) => m.id !== memberId) } : g
+      )
+    );
+  }
+
+  if (loading) {
+    return <div className="text-sm text-black/40 dark:text-white/40 text-center py-12">Loading…</div>;
+  }
+
+  return (
+    <div className="flex flex-col gap-8">
+      {/* Enable toggle */}
+      <Section title="Groups" action={<AutosaveIndicator status={enabledAutoStatus} />}>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-black dark:text-white">Show groups on profile</p>
+            <p className="text-xs text-black/40 dark:text-white/40">Showcase other creators on your page</p>
+          </div>
+          <button
+            onClick={() => setEnabled(!enabled)}
+            className={`relative h-6 w-11 rounded-full transition-colors ${enabled ? "bg-emerald-500" : "bg-black/10 dark:bg-white/10"}`}
+          >
+            <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${enabled ? "translate-x-5" : ""}`} />
+          </button>
+        </div>
+      </Section>
+
+      {enabled && (
+        <>
+          {/* Groups list */}
+          {groupsList.map((group) => (
+            <Section
+              key={group.id}
+              title={group.name}
+              action={
+                <button
+                  onClick={() => deleteGroup(group.id)}
+                  className="text-xs text-red-400 hover:text-red-500 transition-colors"
+                >
+                  Delete group
+                </button>
+              }
+            >
+              {/* Group name */}
+              <Field label="Group name">
+                <Input
+                  value={group.name}
+                  onChange={(v) => updateGroupName(group.id, v)}
+                  placeholder="e.g. My Crew, Collaborators"
+                />
+              </Field>
+
+              {/* Current members */}
+              <Field label="Members">
+                {group.members.length === 0 ? (
+                  <p className="text-xs text-black/30 dark:text-white/30 py-2">No members yet — search for users to add</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {group.members.map((m) => (
+                      <div key={m.id} className="flex items-center gap-3 p-2 rounded-lg border border-black/5 dark:border-white/5">
+                        <div className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
+                          {m.avatarUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={m.avatarUrl} alt="" className="h-full w-full object-cover" />
+                          ) : (
+                            <span className="text-[10px] font-semibold text-black/40 dark:text-white/40">{m.avatarInitials || "?"}</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-black dark:text-white truncate">{m.name || m.username}</p>
+                          <p className="text-xs text-black/40 dark:text-white/40">@{m.username}</p>
+                        </div>
+                        <button
+                          onClick={() => removeMember(group.id, m.id)}
+                          className="shrink-0 text-xs text-red-400 hover:text-red-500 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+
+              {/* Add member search */}
+              {addingToGroup === group.id ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2">
+                    <input
+                      value={searchQuery}
+                      onChange={(e) => handleSearch(e.target.value)}
+                      placeholder="Search by @handle…"
+                      autoFocus
+                      className="h-8 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-3 text-sm text-black dark:text-white placeholder-black/20 dark:placeholder-white/20 outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                    />
+                    <button
+                      onClick={() => { setAddingToGroup(null); setSearchQuery(""); setSearchResults([]); }}
+                      className="h-8 px-3 rounded-md border border-black/10 dark:border-white/10 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {searching && <p className="text-xs text-black/30 dark:text-white/30">Searching…</p>}
+                  {searchResults.length > 0 && (
+                    <div className="flex flex-col gap-1 max-h-48 overflow-y-auto">
+                      {searchResults.map((r) => {
+                        const alreadyMember = group.members.some((m) => m.profileId === r.id);
+                        return (
+                          <button
+                            key={r.id}
+                            onClick={() => !alreadyMember && addMember(group.id, r.id)}
+                            disabled={alreadyMember}
+                            className={`flex items-center gap-3 p-2 rounded-lg text-left transition-colors ${alreadyMember ? "opacity-40 cursor-not-allowed" : "hover:bg-black/5 dark:hover:bg-white/5"}`}
+                          >
+                            <div className="h-8 w-8 rounded-full bg-black/5 dark:bg-white/5 flex items-center justify-center overflow-hidden shrink-0">
+                              {r.avatarUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={r.avatarUrl} alt="" className="h-full w-full object-cover" />
+                              ) : (
+                                <span className="text-[10px] font-semibold text-black/40 dark:text-white/40">{r.avatarInitials || "?"}</span>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-black dark:text-white truncate">{r.name || r.username}</p>
+                              <p className="text-xs text-black/40 dark:text-white/40">@{r.username}</p>
+                            </div>
+                            <span className="text-xs text-black/30 dark:text-white/30">
+                              {alreadyMember ? "Added" : "Add"}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {!searching && searchQuery.replace(/^@/, "").trim().length >= 2 && searchResults.length === 0 && (
+                    <p className="text-xs text-black/30 dark:text-white/30">No users found</p>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAddingToGroup(group.id)}
+                  className="h-8 w-full rounded-md border border-dashed border-black/15 dark:border-white/15 text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+                >
+                  + Add member
+                </button>
+              )}
+            </Section>
+          ))}
+
+          {/* Add group button */}
+          <button
+            onClick={createGroup}
+            className="h-10 w-full rounded-xl border border-dashed border-black/15 dark:border-white/15 text-xs font-medium text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+          >
+            + Create group
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -73,6 +73,7 @@ export async function GET() {
       galleryEnabled: profile.galleryEnabled,
       galleryTitle: profile.galleryTitle,
       galleryColumns: profile.galleryColumns,
+      groupsEnabled: profile.groupsEnabled,
     },
     links: userLinks.map((l) => ({
       id: l.id,

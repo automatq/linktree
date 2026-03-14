@@ -5,7 +5,7 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { db } from "@/db";
-import { profiles, links, socialLinks, profileViews, products, galleryImages, previousUsernames } from "@/db/schema";
+import { profiles, links, socialLinks, profileViews, products, galleryImages, previousUsernames, groups, groupMembers } from "@/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
@@ -22,6 +22,7 @@ import { CountdownCard } from "@/components/CountdownCard";
 import { HeroCard } from "@/components/HeroCard";
 import { MediaGallery } from "@/components/MediaGallery";
 import { ContactFormWidget } from "@/components/ContactFormWidget";
+import { GroupShowcase } from "@/components/GroupShowcase";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
@@ -111,11 +112,31 @@ export default async function ProfilePage({
 
   const isOwner = userId === profile.userId;
 
-  const [userLinks, userSocials, userProducts, userGallery] = await Promise.all([
+  const [userLinks, userSocials, userProducts, userGallery, userGroups] = await Promise.all([
     db.select().from(links).where(eq(links.profileId, profile.id)).orderBy(asc(links.position)),
     db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
     db.select().from(products).where(eq(products.profileId, profile.id)).orderBy(asc(products.position)),
     db.select().from(galleryImages).where(eq(galleryImages.profileId, profile.id)).orderBy(asc(galleryImages.position)),
+    // Fetch groups with members
+    (async () => {
+      if (!profile.groupsEnabled) return [];
+      const userGroups = await db.select().from(groups).where(eq(groups.profileId, profile.id)).orderBy(asc(groups.position));
+      return Promise.all(userGroups.map(async (g) => {
+        const members = await db
+          .select({
+            id: groupMembers.id,
+            username: profiles.username,
+            name: profiles.name,
+            avatarUrl: profiles.avatarUrl,
+            avatarInitials: profiles.avatarInitials,
+          })
+          .from(groupMembers)
+          .innerJoin(profiles, eq(groupMembers.memberProfileId, profiles.id))
+          .where(eq(groupMembers.groupId, g.id))
+          .orderBy(asc(groupMembers.position));
+        return { id: g.id, name: g.name, members };
+      }));
+    })(),
   ]);
   const activeProducts = userProducts.filter((p) => p.active);
 
@@ -352,6 +373,13 @@ export default async function ProfilePage({
               accentColor={accentColor}
             />
           </section>
+        )}
+
+        {/* Groups */}
+        {profile.groupsEnabled && userGroups.length > 0 && (
+          <div className="w-full mt-4 flex flex-col gap-4">
+            <GroupShowcase groups={userGroups} accentColor={accentColor} />
+          </div>
         )}
 
         {/* Store */}
