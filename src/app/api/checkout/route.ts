@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import { db } from "@/db";
 import { profiles, products, orders } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { decryptStripeKey } from "@/lib/crypto";
 
 function genId() {
   return crypto.randomUUID();
@@ -27,7 +28,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Product not found" }, { status: 404 });
   }
 
-  const stripe = new Stripe(profile.stripeSecretKey);
+  const stripe = new Stripe(decryptStripeKey(profile.stripeSecretKey));
   const orderId = genId();
   const origin = new URL(req.url).origin;
 

@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { contrastText } from "@/lib/contrast";
 
 type Step = "calendar" | "slots" | "form" | "confirmed";
 
@@ -216,26 +217,26 @@ export function BookingClient({ username, hostName, title, duration, accentColor
                     onClick={() => handleDateSelect(dateStr)}
                     className={`relative flex h-8 w-full items-center justify-center rounded-lg text-sm transition-all ${
                       isSelected
-                        ? "text-white font-semibold"
+                        ? "font-semibold"
                         : isAvailable && !isPast
-                          ? "text-black dark:text-white hover:text-white font-medium"
+                          ? "text-black dark:text-white font-medium"
                           : "text-black/20 dark:text-white/20 cursor-not-allowed"
                     }`}
                     style={
                       isSelected
-                        ? { background: accent }
-                        : isAvailable && !isPast
-                          ? undefined
-                          : undefined
+                        ? { background: accent, color: contrastText(accent) }
+                        : undefined
                     }
                     onMouseEnter={(e) => {
                       if (isAvailable && !isPast && !isSelected) {
                         (e.currentTarget as HTMLButtonElement).style.background = accent + "cc";
+                        (e.currentTarget as HTMLButtonElement).style.color = contrastText(accent);
                       }
                     }}
                     onMouseLeave={(e) => {
                       if (!isSelected) {
                         (e.currentTarget as HTMLButtonElement).style.background = "";
+                        (e.currentTarget as HTMLButtonElement).style.color = "";
                       }
                     }}
                   >
@@ -243,7 +244,7 @@ export function BookingClient({ username, hostName, title, duration, accentColor
                     {isAvailable && !isPast && (
                       <span
                         className="absolute bottom-0.5 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full"
-                        style={{ background: isSelected ? "white" : accent }}
+                        style={{ background: isSelected ? contrastText(accent) : accent }}
                       />
                     )}
                   </button>
@@ -294,7 +295,7 @@ export function BookingClient({ username, hostName, title, duration, accentColor
                     } : undefined}
                     onMouseEnter={accentColor ? (e) => {
                       (e.currentTarget as HTMLButtonElement).style.background = accent;
-                      (e.currentTarget as HTMLButtonElement).style.color = "white";
+                      (e.currentTarget as HTMLButtonElement).style.color = contrastText(accent);
                       (e.currentTarget as HTMLButtonElement).style.borderColor = accent;
                     } : undefined}
                     onMouseLeave={accentColor ? (e) => {
@@ -382,8 +383,8 @@ export function BookingClient({ username, hostName, title, duration, accentColor
               <button
                 type="submit"
                 disabled={submitting}
-                className={`mt-1 w-full rounded-lg py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50 ${accentColor ? "text-white" : "bg-black dark:bg-white text-white dark:text-black"}`}
-                style={accentColor ? { background: accent } : undefined}
+                className={`mt-1 w-full rounded-lg py-2.5 text-sm font-semibold transition-opacity disabled:opacity-50 ${accentColor ? "" : "bg-black dark:bg-white text-white dark:text-black"}`}
+                style={accentColor ? { background: accent, color: contrastText(accent) } : undefined}
               >
                 {submitting ? "Confirming…" : "Confirm booking"}
               </button>

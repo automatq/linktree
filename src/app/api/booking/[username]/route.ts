@@ -44,50 +44,56 @@ export async function POST(
   const endsAt = new Date(startsAt.getTime() + duration * 60 * 1000);
   const hostTz = profile.bookingTimezone || "UTC";
 
-  // Validate the slot is still available
+  // Validate the slot is still available AND insert atomically to prevent double-booking
   const date = startsAt.toLocaleDateString("sv-SE", { timeZone: hostTz }); // "YYYY-MM-DD"
   const dayStart = new Date(`${date}T00:00:00Z`);
   const dayEnd = new Date(`${date}T23:59:59Z`);
+  const id = genId();
 
-  const [windows, existing] = await Promise.all([
-    db.select().from(availability).where(eq(availability.profileId, profile.id)),
-    db.select().from(bookings).where(
-      and(
-        eq(bookings.profileId, profile.id),
-        eq(bookings.status, "confirmed"),
-        gte(bookings.startsAt, dayStart),
-        lte(bookings.startsAt, dayEnd)
-      )
-    ),
-  ]);
+  const inserted = await db.transaction(async (tx) => {
+    const [windows, existing] = await Promise.all([
+      tx.select().from(availability).where(eq(availability.profileId, profile.id)),
+      tx.select().from(bookings).where(
+        and(
+          eq(bookings.profileId, profile.id),
+          eq(bookings.status, "confirmed"),
+          gte(bookings.startsAt, dayStart),
+          lte(bookings.startsAt, dayEnd)
+        )
+      ),
+    ]);
 
-  const availableSlots = generateSlots(
-    date,
-    windows,
-    existing.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
-    duration,
-    profile.bookingBuffer ?? 0,
-    hostTz
-  );
+    const availableSlots = generateSlots(
+      date,
+      windows,
+      existing.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
+      duration,
+      profile.bookingBuffer ?? 0,
+      hostTz
+    );
 
-  const isValid = availableSlots.some((s) => s.getTime() === startsAt.getTime());
-  if (!isValid) {
+    const isValid = availableSlots.some((s) => s.getTime() === startsAt.getTime());
+    if (!isValid) return false;
+
+    await tx.insert(bookings).values({
+      id,
+      profileId: profile.id,
+      guestName,
+      guestEmail,
+      startsAt,
+      endsAt,
+      notes: notes || "",
+      status: "confirmed",
+      guestTimezone: guestTimezone || "UTC",
+      guestPhone: guestPhone || "",
+    });
+
+    return true;
+  });
+
+  if (!inserted) {
     return NextResponse.json({ error: "Slot no longer available" }, { status: 409 });
   }
-
-  const id = genId();
-  await db.insert(bookings).values({
-    id,
-    profileId: profile.id,
-    guestName,
-    guestEmail,
-    startsAt,
-    endsAt,
-    notes: notes || "",
-    status: "confirmed",
-    guestTimezone: guestTimezone || "UTC",
-    guestPhone: guestPhone || "",
-  });
 
   // Send emails
   const emailData = {

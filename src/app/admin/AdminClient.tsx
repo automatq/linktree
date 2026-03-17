@@ -366,6 +366,7 @@ export function AdminClient() {
   }
 
   function deleteLink(id: string) {
+    if (!confirm("Delete this link?")) return;
     const next = { ...data!, links: data!.links.filter((l) => l.id !== id) };
     setData(next);
   }
@@ -401,6 +402,7 @@ export function AdminClient() {
   }
 
   function deleteSocial(platform: string) {
+    if (!confirm("Delete this social link?")) return;
     const next = {
       ...data!,
       socialLinks: data!.socialLinks.filter((s) => s.platform !== platform),
@@ -1081,6 +1083,7 @@ export function AdminClient() {
                               </div>
                               <button
                                 onClick={async () => {
+                                  if (!confirm("Delete this wall note?")) return;
                                   await fetch("/api/admin/wall", {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
@@ -1163,6 +1166,7 @@ export function AdminClient() {
                           </span>
                           <button
                             onClick={async () => {
+                              if (!confirm("Delete this voice room and all responses?")) return;
                               await fetch("/api/admin/voice-rooms", {
                                 method: "POST",
                                 headers: { "Content-Type": "application/json" },
@@ -1389,6 +1393,7 @@ export function AdminClient() {
                 customDomain ? (
                   <button
                     onClick={async () => {
+                      if (!confirm("Remove your custom domain?")) return;
                       setSavingDomain(true);
                       await fetch("/api/admin/domain", { method: "DELETE" });
                       setCustomDomain("");
@@ -2078,6 +2083,7 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
   }
 
   function deleteProd(id: string) {
+    if (!confirm("Delete this product?")) return;
     setProds((prev) => prev.filter((p) => p.id !== id));
   }
 
@@ -2142,6 +2148,7 @@ function StoreTab({ profile, username }: { profile: import("@/data/links").Profi
   }
 
   async function deleteSubscriber(id: string) {
+    if (!confirm("Remove this subscriber?")) return;
     await fetch("/api/admin/subscribers", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
@@ -2567,6 +2574,7 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
   }
 
   async function deleteGroup(groupId: string) {
+    if (!confirm("Delete this group? Members will be removed.")) return;
     await fetch("/api/admin/groups", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3085,6 +3093,7 @@ function TrackableLinksSection() {
   }
 
   async function remove(id: string) {
+    if (!confirm("Delete this tracked link?")) return;
     await fetch("/api/admin/tracked-links", {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },

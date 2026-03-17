@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { isRateLimited } from "@/lib/rate-limit";
+import { decryptStripeKey } from "@/lib/crypto";
 
 export async function POST(req: Request) {
   // Rate limit: 10 tip attempts per IP per 15 minutes
@@ -28,7 +29,7 @@ export async function POST(req: Request) {
   const amountCents = Math.round(Number(amount) * 100);
   if (amountCents < 50) return NextResponse.json({ error: "Minimum tip is $0.50" }, { status: 400 });
 
-  const stripe = new Stripe(profile.stripeSecretKey);
+  const stripe = new Stripe(decryptStripeKey(profile.stripeSecretKey));
   const origin = new URL(req.url).origin;
 
   const session = await stripe.checkout.sessions.create({

@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { encrypt } from "@/lib/crypto";
 
 export async function POST(req: Request) {
   const { userId } = await auth();
@@ -22,7 +23,8 @@ export async function POST(req: Request) {
     stripePublishableKey: publishableKey || "",
   };
   // Only overwrite secret key if a new one is explicitly provided
-  if (secretKey) update.stripeSecretKey = secretKey;
+  // Encrypt at rest — decrypted only when creating Stripe sessions
+  if (secretKey) update.stripeSecretKey = encrypt(secretKey);
 
   await db.update(profiles).set(update).where(eq(profiles.userId, userId));
 
