@@ -3,8 +3,15 @@ import Stripe from "stripe";
 import { db } from "@/db";
 import { profiles } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { isRateLimited } from "@/lib/rate-limit";
 
 export async function POST(req: Request) {
+  // Rate limit: 10 tip attempts per IP per 15 minutes
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  if (isRateLimited(`tip:${ip}`, 10, 15 * 60 * 1000)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+  }
+
   const { username, amount } = await req.json(); // amount in dollars
 
   if (!username || !amount || isNaN(Number(amount)) || Number(amount) <= 0) {

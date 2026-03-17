@@ -10,10 +10,13 @@ export async function GET(req: Request) {
   if (!apiKey) return NextResponse.json({ isLive: false });
 
   try {
-    const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=snippet&id=${videoId}&key=${apiKey}`,
-      { next: { revalidate: 30 } } // cache for 30s to reduce API calls
-    );
+    const ytUrl = new URL("https://www.googleapis.com/youtube/v3/videos");
+    ytUrl.searchParams.set("part", "snippet");
+    ytUrl.searchParams.set("id", videoId);
+    ytUrl.searchParams.set("key", apiKey);
+    const res = await fetch(ytUrl.toString(), {
+      next: { revalidate: 30 }, // cache for 30s to reduce API calls
+    });
     const data = await res.json();
     const isLive = data?.items?.[0]?.snippet?.liveBroadcastContent === "live";
     return NextResponse.json({ isLive });

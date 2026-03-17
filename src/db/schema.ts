@@ -115,7 +115,10 @@ export const linkClicks = pgTable("link_clicks", {
   referrer: text("referrer").notNull().default(""),
   device: text("device").notNull().default(""),
   country: text("country").notNull().default(""),
-});
+}, (t) => [
+  index("link_clicks_profile_id_clicked_at_idx").on(t.profileId, t.clickedAt),
+  index("link_clicks_link_id_idx").on(t.linkId),
+]);
 
 export const profileViews = pgTable("profile_views", {
   id: serial("id").primaryKey(),
@@ -126,6 +129,7 @@ export const profileViews = pgTable("profile_views", {
   country: text("country").notNull().default(""),
 }, (t) => [
   index("profile_views_profile_id_idx").on(t.profileId),
+  index("profile_views_profile_id_viewed_at_idx").on(t.profileId, t.viewedAt),
 ]);
 
 // Trackable links (named short links for external use)
@@ -145,7 +149,10 @@ export const trackedLinkClicks = pgTable("tracked_link_clicks", {
   referrer: text("referrer").notNull().default(""),
   device: text("device").notNull().default(""),
   country: text("country").notNull().default(""),
-});
+}, (t) => [
+  index("tracked_link_clicks_tracked_link_id_idx").on(t.trackedLinkId, t.clickedAt),
+  index("tracked_link_clicks_profile_id_idx").on(t.profileId),
+]);
 
 // Media gallery images
 export const galleryImages = pgTable("gallery_images", {
@@ -194,7 +201,9 @@ export const orders = pgTable("orders", {
   stripeSessionId: text("stripe_session_id").notNull().default(""),
   status: text("status").notNull().default("pending"), // pending | paid
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => [
+  index("orders_profile_id_created_at_idx").on(t.profileId, t.createdAt),
+]);
 
 // Email subscribers
 export const subscribers = pgTable("subscribers", {
@@ -274,7 +283,7 @@ export const reviews = pgTable("reviews", {
   id: text("id").primaryKey(),
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   authorProfileId: integer("author_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  recommend: boolean("recommend").notNull(), // thumbs up (true) / thumbs down (false)
+  recommend: boolean("recommend").notNull(), // thumbs up / thumbs down
   audioUrl: text("audio_url").notNull(), // voice review (required)
   audioDuration: integer("audio_duration").notNull().default(0), // seconds
   text: text("text").notNull().default(""), // optional written summary
