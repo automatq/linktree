@@ -23,6 +23,7 @@ export async function POST(
 ) {
   const { username } = await params;
 
+  try {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (isRateLimited(`booking:${ip}`, 5, 15 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
@@ -82,9 +83,8 @@ export async function POST(
       const memberSlotInfos: GroupMemberSlotInfo[] = [];
 
       for (const member of acceptedMembers) {
-        const memberProfile = await tx.query.profiles.findFirst({
-          where: eq(profiles.id, member.profileId),
-        });
+        const memberProfileRows = await tx.select().from(profiles).where(eq(profiles.id, member.profileId));
+        const memberProfile = memberProfileRows[0] ?? null;
 
         const [memberWindows, memberBookings] = await Promise.all([
           tx.select().from(availability).where(eq(availability.profileId, member.profileId)),
@@ -263,4 +263,9 @@ export async function POST(
   }
 
   return NextResponse.json({ ok: true, id });
+
+  } catch (err: any) {
+    console.error("Booking error:", err);
+    return NextResponse.json({ error: err?.message || "Internal error" }, { status: 500 });
+  }
 }
