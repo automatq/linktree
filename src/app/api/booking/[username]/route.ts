@@ -63,10 +63,12 @@ export async function POST(
       and(eq(groups.id, groupId), eq(groups.profileId, profile.id))
     );
     if (group.length > 0) {
+      // Always include the profile owner
+      acceptedMembers.push({ profileId: profile.id });
       const members = await db.select().from(groupMembers).where(
         and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "accepted"))
       );
-      acceptedMembers = members.map((m) => ({ profileId: m.memberProfileId }));
+      members.forEach((m) => acceptedMembers.push({ profileId: m.memberProfileId }));
     }
   }
 

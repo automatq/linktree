@@ -78,10 +78,13 @@ export async function GET(
       and(eq(groups.id, groupId), eq(groups.profileId, profile.id))
     );
     if (group.length > 0) {
+      // Always include the profile owner in the shared calendar
+      acceptedMembers.push({ profileId: profile.id });
+      // Add accepted group members
       const members = await db.select().from(groupMembers).where(
         and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "accepted"))
       );
-      acceptedMembers = members.map((m) => ({ profileId: m.memberProfileId }));
+      members.forEach((m) => acceptedMembers.push({ profileId: m.memberProfileId }));
     }
   }
 
