@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { db } from "@/db";
-import { profiles, availability, bookings, groups, groupMembers } from "@/db/schema";
+import { profiles, availability, bookings, groups, groupMembers, blockedDates } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { generateSlots, generateGroupSlots, pickGroupMember } from "@/lib/slots";
 import type { GroupMemberSlotInfo } from "@/lib/slots";
@@ -24,6 +24,7 @@ export async function POST(
   const { username } = await params;
 
   try {
+
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (isRateLimited(`booking:${ip}`, 5, 15 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
@@ -64,7 +65,6 @@ export async function POST(
       and(eq(groups.id, groupId), eq(groups.profileId, profile.id))
     );
     if (group.length > 0) {
-      // Always include the profile owner
       acceptedMembers.push({ profileId: profile.id });
       const members = await db.select().from(groupMembers).where(
         and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "accepted"))
@@ -75,95 +75,28 @@ export async function POST(
 
   const isGroupMode = acceptedMembers.length > 0;
   let assignedProfileId: number | null = null;
-  let assignedProfile: typeof profile | null = null;
+  let assignedProfile: { name: string; bookingEmail: string; bookingSmsNumber: string; bookingTimezone: string } | null = null;
 
   if (isGroupMode) {
-    // Group booking — validate slot and assign member atomically
-    const result = await db.transaction(async (tx) => {
-      const memberSlotInfos: GroupMemberSlotInfo[] = [];
+    // Build per-member slot info
+    const memberSlotInfos: GroupMemberSlotInfo[] = [];
 
-      for (const member of acceptedMembers) {
-        const memberProfileRows = await tx.select().from(profiles).where(eq(profiles.id, member.profileId));
-        const memberProfile = memberProfileRows[0] ?? null;
+    for (const member of acceptedMembers) {
+      // Skip members who blocked this date
+      const memberBlocked = await db.select().from(blockedDates).where(
+        and(eq(blockedDates.profileId, member.profileId), eq(blockedDates.date, date))
+      );
+      if (memberBlocked.length > 0) continue;
 
-        const [memberWindows, memberBookings] = await Promise.all([
-          tx.select().from(availability).where(eq(availability.profileId, member.profileId)),
-          tx.select().from(bookings).where(
-            and(
-              eq(bookings.profileId, profile.id),
-              eq(bookings.assignedMemberProfileId, member.profileId),
-              eq(bookings.status, "confirmed"),
-              gte(bookings.startsAt, dayStart),
-              lte(bookings.startsAt, dayEnd)
-            )
-          ),
-        ]);
+      const memberProfileRows = await db.select().from(profiles).where(eq(profiles.id, member.profileId));
+      const memberProfile = memberProfileRows[0] ?? null;
 
-        memberSlotInfos.push({
-          profileId: member.profileId,
-          windows: memberWindows.map((w) => ({
-            dayOfWeek: w.dayOfWeek,
-            startTime: w.startTime,
-            endTime: w.endTime,
-          })),
-          existing: memberBookings.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
-          timezone: memberProfile?.bookingTimezone || hostTz,
-        });
-      }
-
-      const groupSlots = generateGroupSlots(date, memberSlotInfos, duration, buffer);
-      const matchingSlot = groupSlots.find((s) => s.startsAt.getTime() === startsAt.getTime());
-      if (!matchingSlot || matchingSlot.availableProfileIds.length === 0) return null;
-
-      // Count bookings per member for assignment
-      const bookingCounts = new Map<number, number>();
-      for (const member of acceptedMembers) {
-        const count = await tx.select().from(bookings).where(
+      const [memberWindows, memberBookings] = await Promise.all([
+        db.select().from(availability).where(eq(availability.profileId, member.profileId)),
+        db.select().from(bookings).where(
           and(
             eq(bookings.profileId, profile.id),
             eq(bookings.assignedMemberProfileId, member.profileId),
-            eq(bookings.status, "confirmed"),
-          )
-        );
-        bookingCounts.set(member.profileId, count.length);
-      }
-
-      const strategy = (profile.bookingStrategy as "least-busy" | "round-robin") || "least-busy";
-      const pickedProfileId = pickGroupMember(matchingSlot.availableProfileIds, strategy, bookingCounts);
-
-      await tx.insert(bookings).values({
-        id,
-        profileId: profile.id,
-        assignedMemberProfileId: pickedProfileId,
-        guestName,
-        guestEmail,
-        startsAt,
-        endsAt,
-        notes: notes || "",
-        status: "confirmed",
-        guestTimezone: guestTimezone || "UTC",
-        guestPhone: guestPhone || "",
-      });
-
-      return pickedProfileId;
-    });
-
-    if (!result) {
-      return NextResponse.json({ error: "Slot no longer available" }, { status: 409 });
-    }
-
-    assignedProfileId = result;
-    assignedProfile = await db.query.profiles.findFirst({
-      where: eq(profiles.id, assignedProfileId),
-    }) ?? null;
-  } else {
-    // Solo booking
-    const inserted = await db.transaction(async (tx) => {
-      const [windows, existing] = await Promise.all([
-        tx.select().from(availability).where(eq(availability.profileId, profile.id)),
-        tx.select().from(bookings).where(
-          and(
-            eq(bookings.profileId, profile.id),
             eq(bookings.status, "confirmed"),
             gte(bookings.startsAt, dayStart),
             lte(bookings.startsAt, dayEnd)
@@ -171,40 +104,114 @@ export async function POST(
         ),
       ]);
 
-      const availableSlots = generateSlots(
-        date,
-        windows,
-        existing.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
-        duration,
-        buffer,
-        hostTz
-      );
-
-      const isValid = availableSlots.some((s) => s.getTime() === startsAt.getTime());
-      if (!isValid) return false;
-
-      await tx.insert(bookings).values({
-        id,
-        profileId: profile.id,
-        guestName,
-        guestEmail,
-        startsAt,
-        endsAt,
-        notes: notes || "",
-        status: "confirmed",
-        guestTimezone: guestTimezone || "UTC",
-        guestPhone: guestPhone || "",
+      memberSlotInfos.push({
+        profileId: member.profileId,
+        windows: memberWindows.map((w) => ({
+          dayOfWeek: w.dayOfWeek,
+          startTime: w.startTime,
+          endTime: w.endTime,
+        })),
+        existing: memberBookings.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
+        timezone: memberProfile?.bookingTimezone || hostTz,
       });
+    }
 
-      return true;
-    });
-
-    if (!inserted) {
+    const groupSlots = generateGroupSlots(date, memberSlotInfos, duration, buffer);
+    const matchingSlot = groupSlots.find((s) => s.startsAt.getTime() === startsAt.getTime());
+    if (!matchingSlot || matchingSlot.availableProfileIds.length === 0) {
       return NextResponse.json({ error: "Slot no longer available" }, { status: 409 });
     }
+
+    // Count bookings per member for assignment
+    const bookingCounts = new Map<number, number>();
+    for (const member of acceptedMembers) {
+      const count = await db.select().from(bookings).where(
+        and(
+          eq(bookings.profileId, profile.id),
+          eq(bookings.assignedMemberProfileId, member.profileId),
+          eq(bookings.status, "confirmed"),
+        )
+      );
+      bookingCounts.set(member.profileId, count.length);
+    }
+
+    const strategy = (profile.bookingStrategy as "least-busy" | "round-robin") || "least-busy";
+    assignedProfileId = pickGroupMember(matchingSlot.availableProfileIds, strategy, bookingCounts);
+
+    await db.insert(bookings).values({
+      id,
+      profileId: profile.id,
+      assignedMemberProfileId: assignedProfileId,
+      guestName,
+      guestEmail,
+      startsAt,
+      endsAt,
+      notes: notes || "",
+      status: "confirmed",
+      guestTimezone: guestTimezone || "UTC",
+      guestPhone: guestPhone || "",
+    });
+
+    const ap = await db.select().from(profiles).where(eq(profiles.id, assignedProfileId));
+    if (ap[0]) {
+      assignedProfile = {
+        name: ap[0].name,
+        bookingEmail: ap[0].bookingEmail,
+        bookingSmsNumber: ap[0].bookingSmsNumber,
+        bookingTimezone: ap[0].bookingTimezone,
+      };
+    }
+  } else {
+    // Solo booking — check if date is blocked
+    const isBlocked = await db.select().from(blockedDates).where(
+      and(eq(blockedDates.profileId, profile.id), eq(blockedDates.date, date))
+    );
+    if (isBlocked.length > 0) {
+      return NextResponse.json({ error: "Slot no longer available" }, { status: 409 });
+    }
+
+    // Validate slot
+    const [windows, existing] = await Promise.all([
+      db.select().from(availability).where(eq(availability.profileId, profile.id)),
+      db.select().from(bookings).where(
+        and(
+          eq(bookings.profileId, profile.id),
+          eq(bookings.status, "confirmed"),
+          gte(bookings.startsAt, dayStart),
+          lte(bookings.startsAt, dayEnd)
+        )
+      ),
+    ]);
+
+    const availableSlots = generateSlots(
+      date,
+      windows,
+      existing.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
+      duration,
+      buffer,
+      hostTz
+    );
+
+    const isValid = availableSlots.some((s) => s.getTime() === startsAt.getTime());
+    if (!isValid) {
+      return NextResponse.json({ error: "Slot no longer available" }, { status: 409 });
+    }
+
+    await db.insert(bookings).values({
+      id,
+      profileId: profile.id,
+      guestName,
+      guestEmail,
+      startsAt,
+      endsAt,
+      notes: notes || "",
+      status: "confirmed",
+      guestTimezone: guestTimezone || "UTC",
+      guestPhone: guestPhone || "",
+    });
   }
 
-  // Send notifications — use assigned member's info if group mode
+  // Send notifications
   const hostName = assignedProfile?.name || profile.name || username;
   const hostEmail = assignedProfile?.bookingEmail || profile.bookingEmail || "";
   const hostSmsNumber = assignedProfile?.bookingSmsNumber || profile.bookingSmsNumber || "";
