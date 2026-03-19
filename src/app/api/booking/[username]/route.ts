@@ -1,9 +1,9 @@
 import { NextResponse, after } from "next/server";
 import { db } from "@/db";
-import { profiles, availability, bookings, teamMembers, teamAvailability } from "@/db/schema";
+import { profiles, availability, bookings, groups, groupMembers } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { generateSlots, generateTeamSlots, pickTeamMember } from "@/lib/slots";
-import type { TeamMemberSlotInfo } from "@/lib/slots";
+import { generateSlots, generateGroupSlots, pickGroupMember } from "@/lib/slots";
+import type { GroupMemberSlotInfo } from "@/lib/slots";
 import { sendGuestConfirmation, sendHostNotification, sendGuestReminder } from "@/lib/email";
 import { sendGuestConfirmationSms, sendHostNotificationSms } from "@/lib/sms";
 import { fireWebhook } from "@/lib/webhook";
@@ -23,7 +23,6 @@ export async function POST(
 ) {
   const { username } = await params;
 
-  // Rate limit: 5 booking attempts per IP per 15 minutes
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
   if (isRateLimited(`booking:${ip}`, 5, 15 * 60 * 1000)) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
@@ -50,36 +49,47 @@ export async function POST(
   const endsAt = new Date(startsAt.getTime() + duration * 60 * 1000);
   const hostTz = profile.bookingTimezone || "UTC";
 
-  const date = startsAt.toLocaleDateString("sv-SE", { timeZone: hostTz }); // "YYYY-MM-DD"
+  const date = startsAt.toLocaleDateString("sv-SE", { timeZone: hostTz });
   const dayStart = new Date(`${date}T00:00:00Z`);
   const dayEnd = new Date(`${date}T23:59:59Z`);
   const id = genId();
 
-  // Check if team mode
-  const activeMembers = profile.teamBookingEnabled
-    ? await db.select().from(teamMembers).where(
-        and(eq(teamMembers.profileId, profile.id), eq(teamMembers.status, "active"))
-      )
-    : [];
+  // Check if shared group calendar is active
+  const groupId = profile.bookingGroupId || "";
+  let acceptedMembers: { profileId: number }[] = [];
 
-  const isTeamMode = profile.teamBookingEnabled && activeMembers.length > 0;
+  if (groupId) {
+    const group = await db.select().from(groups).where(
+      and(eq(groups.id, groupId), eq(groups.profileId, profile.id))
+    );
+    if (group.length > 0) {
+      const members = await db.select().from(groupMembers).where(
+        and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "accepted"))
+      );
+      acceptedMembers = members.map((m) => ({ profileId: m.memberProfileId }));
+    }
+  }
 
-  let assignedMemberId: string | null = null;
-  let assignedMember: typeof activeMembers[0] | null = null;
+  const isGroupMode = acceptedMembers.length > 0;
+  let assignedProfileId: number | null = null;
+  let assignedProfile: typeof profile | null = null;
 
-  if (isTeamMode) {
-    // Team booking — validate slot and assign member atomically
+  if (isGroupMode) {
+    // Group booking — validate slot and assign member atomically
     const result = await db.transaction(async (tx) => {
-      // Load per-member availability and bookings
-      const memberSlotInfos: TeamMemberSlotInfo[] = [];
+      const memberSlotInfos: GroupMemberSlotInfo[] = [];
 
-      for (const member of activeMembers) {
+      for (const member of acceptedMembers) {
+        const memberProfile = await tx.query.profiles.findFirst({
+          where: eq(profiles.id, member.profileId),
+        });
+
         const [memberWindows, memberBookings] = await Promise.all([
-          tx.select().from(teamAvailability).where(eq(teamAvailability.teamMemberId, member.id)),
+          tx.select().from(availability).where(eq(availability.profileId, member.profileId)),
           tx.select().from(bookings).where(
             and(
               eq(bookings.profileId, profile.id),
-              eq(bookings.teamMemberId, member.id),
+              eq(bookings.assignedMemberProfileId, member.profileId),
               eq(bookings.status, "confirmed"),
               gte(bookings.startsAt, dayStart),
               lte(bookings.startsAt, dayEnd)
@@ -88,41 +98,41 @@ export async function POST(
         ]);
 
         memberSlotInfos.push({
-          memberId: member.id,
+          profileId: member.profileId,
           windows: memberWindows.map((w) => ({
             dayOfWeek: w.dayOfWeek,
             startTime: w.startTime,
             endTime: w.endTime,
           })),
           existing: memberBookings.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
-          timezone: member.timezone || hostTz,
+          timezone: memberProfile?.bookingTimezone || hostTz,
         });
       }
 
-      const teamSlots = generateTeamSlots(date, memberSlotInfos, duration, buffer);
-      const matchingSlot = teamSlots.find((s) => s.startsAt.getTime() === startsAt.getTime());
-      if (!matchingSlot || matchingSlot.availableMembers.length === 0) return null;
+      const groupSlots = generateGroupSlots(date, memberSlotInfos, duration, buffer);
+      const matchingSlot = groupSlots.find((s) => s.startsAt.getTime() === startsAt.getTime());
+      if (!matchingSlot || matchingSlot.availableProfileIds.length === 0) return null;
 
-      // Count bookings per member for assignment strategy
-      const bookingCounts = new Map<string, number>();
-      for (const member of activeMembers) {
+      // Count bookings per member for assignment
+      const bookingCounts = new Map<number, number>();
+      for (const member of acceptedMembers) {
         const count = await tx.select().from(bookings).where(
           and(
             eq(bookings.profileId, profile.id),
-            eq(bookings.teamMemberId, member.id),
+            eq(bookings.assignedMemberProfileId, member.profileId),
             eq(bookings.status, "confirmed"),
           )
         );
-        bookingCounts.set(member.id, count.length);
+        bookingCounts.set(member.profileId, count.length);
       }
 
-      const strategy = (profile.teamBookingStrategy as "least-busy" | "round-robin") || "least-busy";
-      const pickedMemberId = pickTeamMember(matchingSlot.availableMembers, strategy, bookingCounts);
+      const strategy = (profile.bookingStrategy as "least-busy" | "round-robin") || "least-busy";
+      const pickedProfileId = pickGroupMember(matchingSlot.availableProfileIds, strategy, bookingCounts);
 
       await tx.insert(bookings).values({
         id,
         profileId: profile.id,
-        teamMemberId: pickedMemberId,
+        assignedMemberProfileId: pickedProfileId,
         guestName,
         guestEmail,
         startsAt,
@@ -133,17 +143,19 @@ export async function POST(
         guestPhone: guestPhone || "",
       });
 
-      return pickedMemberId;
+      return pickedProfileId;
     });
 
     if (!result) {
       return NextResponse.json({ error: "Slot no longer available" }, { status: 409 });
     }
 
-    assignedMemberId = result;
-    assignedMember = activeMembers.find((m) => m.id === assignedMemberId) || null;
+    assignedProfileId = result;
+    assignedProfile = await db.query.profiles.findFirst({
+      where: eq(profiles.id, assignedProfileId),
+    }) ?? null;
   } else {
-    // Solo booking — existing logic
+    // Solo booking
     const inserted = await db.transaction(async (tx) => {
       const [windows, existing] = await Promise.all([
         tx.select().from(availability).where(eq(availability.profileId, profile.id)),
@@ -190,10 +202,10 @@ export async function POST(
     }
   }
 
-  // Send notifications — use assigned member's contact info if team mode
-  const hostName = assignedMember?.name || profile.name || username;
-  const hostEmail = assignedMember?.email || profile.bookingEmail || "";
-  const hostSmsNumber = assignedMember?.smsNumber || profile.bookingSmsNumber || "";
+  // Send notifications — use assigned member's info if group mode
+  const hostName = assignedProfile?.name || profile.name || username;
+  const hostEmail = assignedProfile?.bookingEmail || profile.bookingEmail || "";
+  const hostSmsNumber = assignedProfile?.bookingSmsNumber || profile.bookingSmsNumber || "";
 
   const emailData = {
     guestName,
@@ -232,7 +244,6 @@ export async function POST(
       : Promise.resolve(),
   ]);
 
-  // Fire webhook
   const webhookUrl = profile.webhookUrl;
   if (webhookUrl) {
     after(() =>
@@ -244,7 +255,7 @@ export async function POST(
         startsAt: startsAt.toISOString(),
         endsAt: endsAt.toISOString(),
         notes: notes || "",
-        assignedTo: assignedMember?.name || null,
+        assignedTo: assignedProfile?.name || null,
       })
     );
   }

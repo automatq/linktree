@@ -2061,9 +2061,9 @@ type BookingRecord = {
   startsAt: string; endsAt: string; status: string; guestTimezone: string;
 };
 
-type TeamMemberRecord = {
-  id: string; name: string; email: string; timezone: string;
-  smsNumber: string; role: string; status: string;
+type BookingGroup = {
+  id: string; name: string; memberCount: number;
+  members: { profileId: number; name: string }[];
 };
 
 function BookingTab({ profile, username }: { profile: import("@/data/links").Profile; username: string }) {
@@ -2079,14 +2079,10 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [bookingsList, setBookingsList] = useState<BookingRecord[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
 
-  // Team state
-  const [teamEnabled, setTeamEnabled] = useState(profile.teamBookingEnabled ?? false);
-  const [teamStrategy, setTeamStrategy] = useState(profile.teamBookingStrategy ?? "least-busy");
-  const [teamMembersList, setTeamMembersList] = useState<TeamMemberRecord[]>([]);
-  const [teamAvailabilityMap, setTeamAvailabilityMap] = useState<Record<string, AvailabilityWindow[]>>({});
-  const [newMemberName, setNewMemberName] = useState("");
-  const [newMemberEmail, setNewMemberEmail] = useState("");
-  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  // Group calendar state
+  const [bookingGroupId, setBookingGroupId] = useState(profile.bookingGroupId ?? "");
+  const [bookingStrategy, setBookingStrategy] = useState(profile.bookingStrategy ?? "least-busy");
+  const [availableGroups, setAvailableGroups] = useState<BookingGroup[]>([]);
 
   useEffect(() => {
     setLoadingBookings(true);
@@ -2095,10 +2091,9 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       .then((d) => {
         setWindows(d.availability || []);
         setBookingsList(d.bookings || []);
-        setTeamMembersList(d.teamMembers || []);
-        setTeamAvailabilityMap(d.teamAvailability || {});
-        if (d.teamBookingEnabled !== undefined) setTeamEnabled(d.teamBookingEnabled);
-        if (d.teamBookingStrategy) setTeamStrategy(d.teamBookingStrategy);
+        setAvailableGroups(d.groups || []);
+        if (d.bookingGroupId !== undefined) setBookingGroupId(d.bookingGroupId);
+        if (d.bookingStrategy) setBookingStrategy(d.bookingStrategy);
       })
       .finally(() => setLoadingBookings(false));
   }, []);
@@ -2121,11 +2116,11 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        config: { enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, teamBookingEnabled: teamEnabled, teamBookingStrategy: teamStrategy },
+        config: { enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, bookingGroupId, bookingStrategy },
         windows,
       }),
     });
-  }, [enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows, teamEnabled, teamStrategy]);
+  }, [enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows, bookingGroupId, bookingStrategy]);
 
   const cancelBooking = async (id: string) => {
     await fetch(`/api/admin/bookings/${id}`, {
@@ -2136,69 +2131,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
     setBookingsList((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b));
   };
 
-  const addTeamMember = async () => {
-    if (!newMemberName.trim() || !newMemberEmail.trim()) return;
-    const r = await fetch("/api/admin/team", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newMemberName.trim(), email: newMemberEmail.trim(), timezone }),
-    });
-    if (r.ok) {
-      const d = await r.json();
-      setTeamMembersList((prev) => [...prev, {
-        id: d.id, name: newMemberName.trim(), email: newMemberEmail.trim(),
-        timezone, smsNumber: "", role: "member", status: "active",
-      }]);
-      setTeamAvailabilityMap((prev) => ({ ...prev, [d.id]: [] }));
-      setNewMemberName("");
-      setNewMemberEmail("");
-    }
-  };
-
-  const removeTeamMember = async (memberId: string) => {
-    await fetch(`/api/admin/team/${memberId}`, { method: "DELETE" });
-    setTeamMembersList((prev) => prev.filter((m) => m.id !== memberId));
-    setTeamAvailabilityMap((prev) => {
-      const next = { ...prev };
-      delete next[memberId];
-      return next;
-    });
-  };
-
-  const toggleMemberDay = (memberId: string, dow: number) => {
-    setTeamAvailabilityMap((prev) => {
-      const memberWindows = prev[memberId] || [];
-      const existing = memberWindows.find((w) => w.dayOfWeek === dow);
-      const updated = existing
-        ? memberWindows.filter((w) => w.dayOfWeek !== dow)
-        : [...memberWindows, { dayOfWeek: dow, startTime: "09:00", endTime: "17:00" }];
-      return { ...prev, [memberId]: updated };
-    });
-  };
-
-  const updateMemberWindow = (memberId: string, dow: number, field: "startTime" | "endTime", val: string) => {
-    setTeamAvailabilityMap((prev) => {
-      const memberWindows = (prev[memberId] || []).map((w) =>
-        w.dayOfWeek === dow ? { ...w, [field]: val } : w
-      );
-      return { ...prev, [memberId]: memberWindows };
-    });
-  };
-
-  const saveMemberAvailability = async (memberId: string) => {
-    const memberWindows = teamAvailabilityMap[memberId] || [];
-    await fetch(`/api/admin/team/${memberId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ windows: memberWindows }),
-    });
-    setEditingMemberId(null);
-  };
-
-  const getMemberName = (memberId: string | null) => {
-    if (!memberId) return null;
-    return teamMembersList.find((m) => m.id === memberId)?.name || null;
-  };
+  const selectedGroup = availableGroups.find((g) => g.id === bookingGroupId);
 
   const upcoming = bookingsList.filter((b) => b.status === "confirmed" && new Date(b.startsAt) > new Date());
   const past = bookingsList.filter((b) => b.status !== "confirmed" || new Date(b.startsAt) <= new Date());
@@ -2359,142 +2292,55 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
         </Section>
       )}
 
-      {/* Team booking */}
-      {enabled && (
-        <Section title="Team Calendar">
+      {/* Shared group calendar */}
+      {enabled && availableGroups.length > 0 && (
+        <Section title="Shared Calendar">
           <div className="flex flex-col gap-4">
-            {/* Enable team toggle */}
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-black dark:text-white">Enable shared team calendar</p>
-                <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
-                  Multiple team members share one unified booking calendar
-                </p>
-              </div>
-              <button
-                onClick={() => setTeamEnabled((v) => !v)}
-                className={`relative h-6 w-11 rounded-full transition-colors ${teamEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+            <div>
+              <p className="text-sm font-medium text-black dark:text-white mb-1">Link a group</p>
+              <p className="text-xs text-black/40 dark:text-white/40 mb-3">
+                Select a group to share the booking calendar. Each member manages their own availability from their admin panel.
+              </p>
+              <select
+                className={selectClass + " w-full"}
+                value={bookingGroupId}
+                onChange={(e) => setBookingGroupId(e.target.value)}
               >
-                <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${teamEnabled ? "translate-x-5" : "translate-x-0"}`} />
-              </button>
+                <option value="">Solo (only my availability)</option>
+                {availableGroups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {g.name} ({g.memberCount} {g.memberCount === 1 ? "member" : "members"})
+                  </option>
+                ))}
+              </select>
             </div>
 
-            {teamEnabled && (
+            {bookingGroupId && (
               <>
                 {/* Assignment strategy */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Assignment strategy</label>
-                  <select className={selectClass + " w-full"} value={teamStrategy} onChange={(e) => setTeamStrategy(e.target.value)}>
+                  <select className={selectClass + " w-full"} value={bookingStrategy} onChange={(e) => setBookingStrategy(e.target.value)}>
                     <option value="least-busy">Least busy (fewest bookings)</option>
                     <option value="round-robin">Round robin</option>
                   </select>
                 </div>
 
-                {/* Add member form */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Add team member</label>
-                  <div className="flex gap-2">
-                    <input
-                      className={inputClass + " flex-1"}
-                      placeholder="Name"
-                      value={newMemberName}
-                      onChange={(e) => setNewMemberName(e.target.value)}
-                    />
-                    <input
-                      className={inputClass + " flex-1"}
-                      placeholder="Email"
-                      type="email"
-                      value={newMemberEmail}
-                      onChange={(e) => setNewMemberEmail(e.target.value)}
-                    />
-                    <button
-                      onClick={addTeamMember}
-                      disabled={!newMemberName.trim() || !newMemberEmail.trim()}
-                      className="h-8 px-3 rounded-md bg-black dark:bg-white text-white dark:text-black text-xs font-medium disabled:opacity-30 transition-opacity"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-
-                {/* Team members list */}
-                {teamMembersList.filter((m) => m.status === "active").length > 0 && (
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Members</label>
-                    {teamMembersList.filter((m) => m.status === "active").map((member) => (
-                      <div key={member.id} className="rounded-lg border border-black/8 dark:border-white/8 p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <div>
-                            <p className="text-sm font-medium text-black dark:text-white">{member.name}</p>
-                            <p className="text-xs text-black/40 dark:text-white/40">{member.email}</p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => setEditingMemberId(editingMemberId === member.id ? null : member.id)}
-                              className="text-[10px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
-                            >
-                              {editingMemberId === member.id ? "Close" : "Schedule"}
-                            </button>
-                            <button
-                              onClick={() => removeTeamMember(member.id)}
-                              className="text-[10px] text-red-400 hover:text-red-500 transition-colors"
-                            >
-                              Remove
-                            </button>
-                          </div>
+                {/* Show linked members */}
+                {selectedGroup && selectedGroup.members.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Members sharing this calendar</label>
+                    {selectedGroup.members.map((m) => (
+                      <div key={m.profileId} className="flex items-center gap-2 rounded-md border border-black/5 dark:border-white/5 px-3 py-2">
+                        <div className="h-5 w-5 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-[9px] font-bold text-black/40 dark:text-white/40">
+                          {m.name.charAt(0).toUpperCase()}
                         </div>
-
-                        {/* Inline availability editor */}
-                        {editingMemberId === member.id && (
-                          <div className="flex flex-col gap-2 pt-2 border-t border-black/5 dark:border-white/5">
-                            {DAY_LABELS.map((label, dow) => {
-                              const memberWindows = teamAvailabilityMap[member.id] || [];
-                              const win = memberWindows.find((w) => w.dayOfWeek === dow);
-                              const active = !!win;
-                              return (
-                                <div key={dow} className="flex items-center gap-3">
-                                  <button
-                                    onClick={() => toggleMemberDay(member.id, dow)}
-                                    className={`w-10 text-xs font-medium rounded-md px-1 py-1 transition-colors ${
-                                      active
-                                        ? "bg-black dark:bg-white text-white dark:text-black"
-                                        : "border border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"
-                                    }`}
-                                  >
-                                    {label}
-                                  </button>
-                                  {active && win ? (
-                                    <div className="flex items-center gap-2 flex-1">
-                                      <input
-                                        type="time"
-                                        value={win.startTime}
-                                        onChange={(e) => updateMemberWindow(member.id, dow, "startTime", e.target.value)}
-                                        className={inputClass}
-                                      />
-                                      <span className="text-xs text-black/30 dark:text-white/30">–</span>
-                                      <input
-                                        type="time"
-                                        value={win.endTime}
-                                        onChange={(e) => updateMemberWindow(member.id, dow, "endTime", e.target.value)}
-                                        className={inputClass}
-                                      />
-                                    </div>
-                                  ) : (
-                                    <span className="text-xs text-black/20 dark:text-white/20">Unavailable</span>
-                                  )}
-                                </div>
-                              );
-                            })}
-                            <button
-                              onClick={() => saveMemberAvailability(member.id)}
-                              className="mt-1 h-7 px-3 rounded-md bg-black dark:bg-white text-white dark:text-black text-xs font-medium self-end transition-opacity"
-                            >
-                              Save schedule
-                            </button>
-                          </div>
-                        )}
+                        <span className="text-xs text-black dark:text-white">{m.name}</span>
                       </div>
                     ))}
+                    <p className="text-[11px] text-black/30 dark:text-white/30 mt-1">
+                      Each member sets their own availability in the Booking tab of their admin panel. Manage members in the Groups tab.
+                    </p>
                   </div>
                 )}
               </>
@@ -2521,9 +2367,9 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
                     <p className="text-xs text-black/40 dark:text-white/40 truncate">{b.guestEmail}</p>
                     <p className="text-xs text-black/50 dark:text-white/50 mt-0.5">{formatBookingTime(b.startsAt)}</p>
                     {b.notes && <p className="text-xs text-black/30 dark:text-white/30 mt-1 italic">{b.notes}</p>}
-                    {(b as any).teamMemberId && getMemberName((b as any).teamMemberId) && (
+                    {(b as any).assignedMemberName && (
                       <p className="text-[10px] text-black/40 dark:text-white/40 mt-1">
-                        Assigned to <span className="font-medium">{getMemberName((b as any).teamMemberId)}</span>
+                        Assigned to <span className="font-medium">{(b as any).assignedMemberName}</span>
                       </p>
                     )}
                   </div>

@@ -32,9 +32,9 @@ export const profiles = pgTable("profiles", {
   bookingEmail: text("booking_email").notNull().default(""),
   bookingTimezone: text("booking_timezone").notNull().default("UTC"),
   bookingSmsNumber: text("booking_sms_number").notNull().default(""),
-  // Team booking
-  teamBookingEnabled: boolean("team_booking_enabled").notNull().default(false),
-  teamBookingStrategy: text("team_booking_strategy").notNull().default("least-busy"), // "round-robin" | "least-busy"
+  // Shared group calendar
+  bookingGroupId: text("booking_group_id").notNull().default(""), // group ID for shared calendar (empty = solo)
+  bookingStrategy: text("booking_strategy").notNull().default("least-busy"), // "round-robin" | "least-busy"
   socialLinksPosition: text("social_links_position").notNull().default("footer"), // "footer" | "bio"
   customDomain: text("custom_domain").notNull().default(""),
   tipJarEnabled: boolean("tip_jar_enabled").notNull().default(false),
@@ -385,39 +385,11 @@ export const eventRsvps = pgTable("event_rsvps", {
   index("event_rsvps_attendee_idx").on(t.eventId, t.attendeeProfileId),
 ]);
 
-// Team members — multiple users linked to one profile for shared booking
-export const teamMembers = pgTable("team_members", {
-  id: text("id").primaryKey(), // UUID
-  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull(), // Clerk userId
-  name: text("name").notNull().default(""),
-  email: text("email").notNull().default(""),
-  smsNumber: text("sms_number").notNull().default(""),
-  timezone: text("timezone").notNull().default("UTC"),
-  role: text("role").notNull().default("member"), // "owner" | "member"
-  status: text("status").notNull().default("active"), // "active" | "invited" | "removed"
-  createdAt: timestamp("created_at").defaultNow(),
-}, (t) => [
-  index("team_members_profile_id_idx").on(t.profileId),
-  index("team_members_user_id_idx").on(t.userId),
-]);
-
-// Per-member weekly availability windows
-export const teamAvailability = pgTable("team_availability", {
-  id: serial("id").primaryKey(),
-  teamMemberId: text("team_member_id").notNull().references(() => teamMembers.id, { onDelete: "cascade" }),
-  dayOfWeek: integer("day_of_week").notNull(), // 0=Sun…6=Sat
-  startTime: text("start_time").notNull(), // "HH:MM"
-  endTime: text("end_time").notNull(),     // "HH:MM"
-}, (t) => [
-  index("team_availability_member_id_idx").on(t.teamMemberId),
-]);
-
 // Individual bookings
 export const bookings = pgTable("bookings", {
   id: text("id").primaryKey(),
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
-  teamMemberId: text("team_member_id"), // nullable — assigned team member (null for solo profiles)
+  assignedMemberProfileId: integer("assigned_member_profile_id"), // nullable — group member assigned (null for solo)
   guestName: text("guest_name").notNull(),
   guestEmail: text("guest_email").notNull(),
   startsAt: timestamp("starts_at").notNull(),

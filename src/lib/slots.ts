@@ -115,33 +115,32 @@ export function getDayOfWeek(dateStr: string, tz: string): number {
   return days.indexOf(label);
 }
 
-// --- Team booking helpers ---
+// --- Group-based shared calendar helpers ---
 
-export type TeamMemberSlotInfo = {
-  memberId: string;
+export type GroupMemberSlotInfo = {
+  profileId: number;
   windows: AvailabilityWindow[];
   existing: ExistingBooking[];
   timezone: string;
 };
 
-export type TeamSlot = {
+export type GroupSlot = {
   startsAt: Date;
-  availableMembers: string[]; // member IDs who can take this slot
+  availableProfileIds: number[]; // profile IDs of members who can take this slot
 };
 
 /**
- * Generate merged available slots across all team members.
+ * Generate merged available slots across all group members.
  * Returns the union of all members' available times, with metadata
  * about which members are free at each slot.
  */
-export function generateTeamSlots(
+export function generateGroupSlots(
   dateStr: string,
-  members: TeamMemberSlotInfo[],
+  members: GroupMemberSlotInfo[],
   durationMins: number,
   bufferMins: number,
-): TeamSlot[] {
-  // Generate slots per member using their own timezone + availability
-  const slotMap = new Map<number, string[]>(); // timestamp → member IDs
+): GroupSlot[] {
+  const slotMap = new Map<number, number[]>(); // timestamp → profile IDs
 
   for (const member of members) {
     const memberSlots = generateSlots(
@@ -157,50 +156,35 @@ export function generateTeamSlots(
       const ts = slot.getTime();
       const existing = slotMap.get(ts);
       if (existing) {
-        existing.push(member.memberId);
+        existing.push(member.profileId);
       } else {
-        slotMap.set(ts, [member.memberId]);
+        slotMap.set(ts, [member.profileId]);
       }
     }
   }
 
-  // Convert to sorted array
   return Array.from(slotMap.entries())
     .sort(([a], [b]) => a - b)
-    .map(([ts, memberIds]) => ({
+    .map(([ts, profileIds]) => ({
       startsAt: new Date(ts),
-      availableMembers: memberIds,
+      availableProfileIds: profileIds,
     }));
 }
 
 /**
- * Pick the best team member for a slot based on assignment strategy.
+ * Pick the best group member for a slot based on assignment strategy.
  */
-export function pickTeamMember(
-  availableMembers: string[],
+export function pickGroupMember(
+  availableProfileIds: number[],
   strategy: "least-busy" | "round-robin",
-  bookingCounts: Map<string, number>, // memberId → confirmed booking count
-): string {
-  if (availableMembers.length === 1) return availableMembers[0];
+  bookingCounts: Map<number, number>, // profileId → confirmed booking count
+): number {
+  if (availableProfileIds.length === 1) return availableProfileIds[0];
 
-  if (strategy === "least-busy") {
-    // Pick the member with fewest confirmed bookings
-    let bestId = availableMembers[0];
-    let bestCount = bookingCounts.get(bestId) ?? 0;
-    for (const id of availableMembers) {
-      const count = bookingCounts.get(id) ?? 0;
-      if (count < bestCount) {
-        bestId = id;
-        bestCount = count;
-      }
-    }
-    return bestId;
-  }
-
-  // round-robin: same logic (fewest bookings = next in rotation)
-  let bestId = availableMembers[0];
+  // Both strategies use fewest-bookings (round-robin = natural rotation via count)
+  let bestId = availableProfileIds[0];
   let bestCount = bookingCounts.get(bestId) ?? 0;
-  for (const id of availableMembers) {
+  for (const id of availableProfileIds) {
     const count = bookingCounts.get(id) ?? 0;
     if (count < bestCount) {
       bestId = id;

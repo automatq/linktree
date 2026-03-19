@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { profiles, availability, bookings, teamMembers, teamAvailability } from "@/db/schema";
+import { profiles, availability, bookings, groups, groupMembers } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
-import { generateSlots, generateTeamSlots, utcToLocalDate, getDayOfWeek } from "@/lib/slots";
-import type { TeamMemberSlotInfo } from "@/lib/slots";
+import { generateSlots, generateGroupSlots, utcToLocalDate, getDayOfWeek } from "@/lib/slots";
+import type { GroupMemberSlotInfo } from "@/lib/slots";
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 });
@@ -15,7 +15,7 @@ export async function GET(
 ) {
   const { username } = await params;
   const { searchParams } = new URL(req.url);
-  const date = searchParams.get("date"); // "YYYY-MM-DD" in host's timezone
+  const date = searchParams.get("date");
 
   const profile = await db.query.profiles.findFirst({
     where: eq(profiles.username, username.toLowerCase()),
@@ -30,43 +30,52 @@ export async function GET(
   const buffer = profile.bookingBuffer ?? 0;
   const advanceDays = profile.bookingAdvanceDays ?? 30;
 
-  // Check if team booking is enabled with active members
-  const activeMembers = profile.teamBookingEnabled
-    ? await db.select().from(teamMembers).where(
-        and(eq(teamMembers.profileId, profile.id), eq(teamMembers.status, "active"))
-      )
-    : [];
+  // Check if shared group calendar is active
+  const groupId = profile.bookingGroupId || "";
+  let acceptedMembers: { profileId: number }[] = [];
 
-  const isTeamMode = profile.teamBookingEnabled && activeMembers.length > 0;
+  if (groupId) {
+    // Verify group exists and belongs to this profile
+    const group = await db.select().from(groups).where(
+      and(eq(groups.id, groupId), eq(groups.profileId, profile.id))
+    );
+    if (group.length > 0) {
+      const members = await db.select().from(groupMembers).where(
+        and(eq(groupMembers.groupId, groupId), eq(groupMembers.status, "accepted"))
+      );
+      acceptedMembers = members.map((m) => ({ profileId: m.memberProfileId }));
+    }
+  }
+
+  const isGroupMode = acceptedMembers.length > 0;
 
   // --- Available dates (no date param) ---
   if (!date) {
-    if (isTeamMode) {
-      // Union of all team members' available days
-      const allWindows: { teamMemberId: string; dayOfWeek: number }[] = [];
-      for (const member of activeMembers) {
-        const memberWindows = await db.select().from(teamAvailability).where(
-          eq(teamAvailability.teamMemberId, member.id)
+    if (isGroupMode) {
+      // Union of all group members' available days
+      const allDays = new Set<number>();
+      for (const member of acceptedMembers) {
+        const memberWindows = await db.select().from(availability).where(
+          eq(availability.profileId, member.profileId)
         );
-        allWindows.push(...memberWindows.map((w) => ({ teamMemberId: w.teamMemberId, dayOfWeek: w.dayOfWeek })));
+        memberWindows.forEach((w) => allDays.add(w.dayOfWeek));
       }
 
-      if (allWindows.length === 0) return NextResponse.json({ dates: [], timezone: tz });
+      if (allDays.size === 0) return NextResponse.json({ dates: [], timezone: tz });
 
-      const availableDays = new Set(allWindows.map((w) => w.dayOfWeek));
       const dates: string[] = [];
       const now = new Date();
       for (let i = 1; i <= advanceDays; i++) {
         const d = new Date(now.getTime() + i * 86400000);
         const dateStr = utcToLocalDate(d, tz);
         const dow = getDayOfWeek(dateStr, tz);
-        if (availableDays.has(dow)) dates.push(dateStr);
+        if (allDays.has(dow)) dates.push(dateStr);
       }
 
       return NextResponse.json({ dates, timezone: tz });
     }
 
-    // Solo mode — existing logic
+    // Solo mode
     const windows = await db.select().from(availability).where(eq(availability.profileId, profile.id));
     if (windows.length === 0) return NextResponse.json({ dates: [] });
 
@@ -87,17 +96,20 @@ export async function GET(
   const dayStart = new Date(`${date}T00:00:00Z`);
   const dayEnd = new Date(`${date}T23:59:59Z`);
 
-  if (isTeamMode) {
-    // Build per-member slot info
-    const memberSlotInfos: TeamMemberSlotInfo[] = [];
+  if (isGroupMode) {
+    const memberSlotInfos: GroupMemberSlotInfo[] = [];
 
-    for (const member of activeMembers) {
+    for (const member of acceptedMembers) {
+      const memberProfile = await db.query.profiles.findFirst({
+        where: eq(profiles.id, member.profileId),
+      });
+
       const [memberWindows, memberBookings] = await Promise.all([
-        db.select().from(teamAvailability).where(eq(teamAvailability.teamMemberId, member.id)),
+        db.select().from(availability).where(eq(availability.profileId, member.profileId)),
         db.select().from(bookings).where(
           and(
             eq(bookings.profileId, profile.id),
-            eq(bookings.teamMemberId, member.id),
+            eq(bookings.assignedMemberProfileId, member.profileId),
             eq(bookings.status, "confirmed"),
             gte(bookings.startsAt, dayStart),
             lte(bookings.startsAt, dayEnd)
@@ -106,27 +118,27 @@ export async function GET(
       ]);
 
       memberSlotInfos.push({
-        memberId: member.id,
+        profileId: member.profileId,
         windows: memberWindows.map((w) => ({
           dayOfWeek: w.dayOfWeek,
           startTime: w.startTime,
           endTime: w.endTime,
         })),
         existing: memberBookings.map((b) => ({ startsAt: b.startsAt, endsAt: b.endsAt })),
-        timezone: member.timezone || tz,
+        timezone: memberProfile?.bookingTimezone || tz,
       });
     }
 
-    const teamSlots = generateTeamSlots(date, memberSlotInfos, duration, buffer);
+    const groupSlots = generateGroupSlots(date, memberSlotInfos, duration, buffer);
 
     return NextResponse.json({
-      slots: teamSlots.map((s) => s.startsAt.toISOString()),
+      slots: groupSlots.map((s) => s.startsAt.toISOString()),
       duration,
       timezone: tz,
     });
   }
 
-  // Solo mode — existing logic
+  // Solo mode
   const windows = await db.select().from(availability).where(eq(availability.profileId, profile.id));
   const existing = await db.select().from(bookings).where(
     and(
