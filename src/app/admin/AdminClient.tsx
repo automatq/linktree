@@ -2086,6 +2086,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [embedSites, setEmbedSites] = useState<{ origin: string; lastSeen: string }[]>([]);
   const [blockedDatesSet, setBlockedDatesSet] = useState<Set<string>>(new Set());
   const [calMonth, setCalMonth] = useState(() => ({ year: new Date().getFullYear(), month: new Date().getMonth() }));
+  const [configLoaded, setConfigLoaded] = useState(false);
 
   useEffect(() => {
     setLoadingBookings(true);
@@ -2099,6 +2100,18 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
         if (d.bookingGroupId !== undefined) setBookingGroupId(d.bookingGroupId);
         if (d.bookingStrategy) setBookingStrategy(d.bookingStrategy);
         if (d.embedSites) setEmbedSites(d.embedSites);
+        // Sync all config from server to prevent stale overwrites
+        if (d.config) {
+          setEnabled(d.config.enabled ?? false);
+          setTitle(d.config.title ?? "Book a call");
+          setDuration(d.config.duration ?? 30);
+          setBuffer(d.config.buffer ?? 0);
+          setAdvanceDays(d.config.advanceDays ?? 30);
+          setEmail(d.config.email ?? "");
+          setTimezone(d.config.timezone ?? "UTC");
+          setSmsNumber(d.config.smsNumber ?? "");
+        }
+        setConfigLoaded(true);
       })
       .finally(() => setLoadingBookings(false));
   }, []);
@@ -2139,6 +2152,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   };
 
   const bookingAutoStatus = useAutosave(async () => {
+    if (!configLoaded) return; // Don't save until server data is loaded
     await fetch("/api/admin/bookings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2147,7 +2161,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
         windows,
       }),
     });
-  }, [enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows, bookingGroupId, bookingStrategy]);
+  }, [configLoaded, enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows, bookingGroupId, bookingStrategy]);
 
   const cancelBooking = async (id: string) => {
     await fetch(`/api/admin/bookings/${id}`, {

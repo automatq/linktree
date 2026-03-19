@@ -69,6 +69,16 @@ export async function GET() {
     bookingStrategy: profile.bookingStrategy || "least-busy",
     embedSites,
     blockedDates: userBlockedDates.map((b) => b.date),
+    config: {
+      enabled: profile.bookingEnabled,
+      title: profile.bookingTitle,
+      duration: profile.bookingDuration,
+      buffer: profile.bookingBuffer,
+      advanceDays: profile.bookingAdvanceDays,
+      email: profile.bookingEmail,
+      timezone: profile.bookingTimezone,
+      smsNumber: profile.bookingSmsNumber,
+    },
   });
 }
 
