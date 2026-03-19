@@ -99,6 +99,21 @@ export function AdminClient() {
   const [reviewStats, setReviewStats] = useState<{ total: number; recommended: number; percentage: number } | null>(null);
   const [voiceRoomsEnabled, setVoiceRoomsEnabled] = useState(false);
   const [voiceRoomsList, setVoiceRoomsList] = useState<Array<{ id: string; prompt: string; active: boolean; notes: Array<{ id: string; authorUsername: string; duration: number }> }>>([]);
+  const [eventsEnabled, setEventsEnabled] = useState(false);
+  const [eventsList, setEventsList] = useState<Array<{ id: string; title: string; description: string; location: string; coverUrl: string; startsAt: string; endsAt: string | null; maxAttendees: number | null; active: boolean; going: number; interested: number }>>([]);
+  const [newEventTitle, setNewEventTitle] = useState("");
+  const [newEventDesc, setNewEventDesc] = useState("");
+  const [newEventLocation, setNewEventLocation] = useState("");
+  const [newEventStartsAt, setNewEventStartsAt] = useState("");
+  const [newEventEndsAt, setNewEventEndsAt] = useState("");
+  const [newEventMax, setNewEventMax] = useState("");
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [pollsEnabled, setPollsEnabled] = useState(false);
+  const [pollsList, setPollsList] = useState<Array<{ id: string; question: string; active: boolean; multipleChoice: boolean; endsAt: string | null; totalVoters: number; options: Array<{ id: string; text: string; votes: number }> }>>([]);
+  const [newPollQuestion, setNewPollQuestion] = useState("");
+  const [newPollOptions, setNewPollOptions] = useState(["", ""]);
+  const [newPollMultiple, setNewPollMultiple] = useState(false);
+  const [creatingPoll, setCreatingPoll] = useState(false);
   const [wallEnabled, setWallEnabled] = useState(false);
   const [wallTitle, setWallTitle] = useState("The Wall");
   const [wallMaxNotes, setWallMaxNotes] = useState(50);
@@ -172,6 +187,16 @@ export function AdminClient() {
         if (w.wallTitle) setWallTitle(w.wallTitle);
         if (w.wallMaxNotes) setWallMaxNotes(w.wallMaxNotes);
         setWallNotes(w.notes || []);
+      });
+      // Load polls
+      fetch("/api/admin/polls").then((r) => r.json()).then((p) => {
+        setPollsEnabled(p.pollsEnabled ?? false);
+        setPollsList(p.polls || []);
+      });
+      // Load events
+      fetch("/api/admin/events").then((r) => r.json()).then((e) => {
+        setEventsEnabled(e.eventsEnabled ?? false);
+        setEventsList(e.events || []);
       });
     }).catch(() => {
       setLoadError(true);
@@ -248,6 +273,22 @@ export function AdminClient() {
       body: JSON.stringify({ action: "settings", wallEnabled, wallTitle, wallMaxNotes }),
     });
   }, [wallEnabled, wallTitle, wallMaxNotes]);
+
+  const pollsAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/polls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "settings", pollsEnabled }),
+    });
+  }, [pollsEnabled]);
+
+  const eventsAutoStatus = useAutosave(async () => {
+    await fetch("/api/admin/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "settings", eventsEnabled }),
+    });
+  }, [eventsEnabled]);
 
   const pixelAutoStatus = useAutosave(async () => {
     await fetch("/api/admin/pixels", {
@@ -1204,6 +1245,325 @@ export function AdminClient() {
               </div>
             </Section>
 
+            {/* Polls section */}
+            <Section
+              title="Polls"
+              action={<AutosaveIndicator status={pollsAutoStatus} />}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Enable Polls</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Let visitors vote on polls on your profile</p>
+                  </div>
+                  <button
+                    onClick={() => setPollsEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${pollsEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${pollsEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {pollsEnabled && (
+                  <div className="flex flex-col gap-3">
+                    {/* Existing polls */}
+                    {pollsList.map((poll) => (
+                      <div key={poll.id} className="flex flex-col gap-2 p-3 rounded-lg border border-black/5 dark:border-white/5">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-black dark:text-white truncate">{poll.question}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {poll.options.map((o) => (
+                                <span key={o.id} className="text-[10px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5 text-black/50 dark:text-white/50">
+                                  {o.text} ({o.votes})
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const next = !poll.active;
+                              setPollsList((prev) => prev.map((p) => p.id === poll.id ? { ...p, active: next } : p));
+                              fetch("/api/admin/polls", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "toggle", pollId: poll.id, active: next }),
+                              });
+                            }}
+                            className={`shrink-0 h-7 px-2 rounded-md border text-[10px] font-medium transition-colors ${poll.active ? "border-emerald-200 text-emerald-600 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:bg-emerald-900/20" : "border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"}`}
+                          >
+                            {poll.active ? "Active" : "Paused"}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-black/30 dark:text-white/30">
+                            {poll.totalVoters} {poll.totalVoters === 1 ? "voter" : "voters"}
+                            {poll.multipleChoice && " · multiple choice"}
+                          </span>
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Delete this poll and all votes?")) return;
+                              await fetch("/api/admin/polls", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "delete", pollId: poll.id }),
+                              });
+                              setPollsList((prev) => prev.filter((p) => p.id !== poll.id));
+                            }}
+                            className="text-[10px] text-red-400 hover:text-red-500 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Create new poll */}
+                    <div className="p-3 rounded-lg border border-dashed border-black/15 dark:border-white/15 flex flex-col gap-2">
+                      <input
+                        value={newPollQuestion}
+                        onChange={(e) => setNewPollQuestion(e.target.value)}
+                        placeholder="Ask a question…"
+                        maxLength={200}
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                      />
+                      {newPollOptions.map((opt, i) => (
+                        <div key={i} className="flex items-center gap-1.5">
+                          <input
+                            value={opt}
+                            onChange={(e) => {
+                              const next = [...newPollOptions];
+                              next[i] = e.target.value;
+                              setNewPollOptions(next);
+                            }}
+                            placeholder={`Option ${i + 1}`}
+                            maxLength={100}
+                            className="h-7 flex-1 rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-[11px] text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                          />
+                          {newPollOptions.length > 2 && (
+                            <button
+                              onClick={() => setNewPollOptions((prev) => prev.filter((_, j) => j !== i))}
+                              className="text-[10px] text-red-400 hover:text-red-500 transition-colors shrink-0"
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {newPollOptions.length < 10 && (
+                        <button
+                          onClick={() => setNewPollOptions((prev) => [...prev, ""])}
+                          className="text-[10px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors self-start"
+                        >
+                          + Add option
+                        </button>
+                      )}
+                      <div className="flex items-center gap-3 pt-1">
+                        <label className="flex items-center gap-1.5 text-[10px] text-black/40 dark:text-white/40 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newPollMultiple}
+                            onChange={(e) => setNewPollMultiple(e.target.checked)}
+                            className="rounded border-black/20 dark:border-white/20"
+                          />
+                          Allow multiple selections
+                        </label>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          const opts = newPollOptions.filter((o) => o.trim());
+                          if (!newPollQuestion.trim() || opts.length < 2) return;
+                          setCreatingPoll(true);
+                          try {
+                            const res = await fetch("/api/admin/polls", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({ action: "create", question: newPollQuestion, options: opts, multipleChoice: newPollMultiple }),
+                            });
+                            const d = await res.json();
+                            if (d.poll) {
+                              setPollsList((prev) => [...prev, d.poll]);
+                              setNewPollQuestion("");
+                              setNewPollOptions(["", ""]);
+                              setNewPollMultiple(false);
+                            }
+                          } finally {
+                            setCreatingPoll(false);
+                          }
+                        }}
+                        disabled={creatingPoll || !newPollQuestion.trim() || newPollOptions.filter((o) => o.trim()).length < 2}
+                        className="h-7 w-full rounded-md bg-black dark:bg-white text-white dark:text-black text-[11px] font-medium transition-opacity hover:opacity-80 disabled:opacity-30"
+                      >
+                        {creatingPoll ? "Creating…" : "Create poll"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
+            {/* Events section */}
+            <Section
+              title="Events"
+              action={<AutosaveIndicator status={eventsAutoStatus} />}
+            >
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-black dark:text-white">Enable Events</p>
+                    <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">Create events with RSVP for launches, meetups, livestreams</p>
+                  </div>
+                  <button
+                    onClick={() => setEventsEnabled((v) => !v)}
+                    className={`relative h-6 w-11 rounded-full transition-colors ${eventsEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${eventsEnabled ? "translate-x-5" : "translate-x-0"}`} />
+                  </button>
+                </div>
+
+                {eventsEnabled && (
+                  <div className="flex flex-col gap-3">
+                    {/* Existing events */}
+                    {eventsList.map((event) => (
+                      <div key={event.id} className="flex flex-col gap-2 p-3 rounded-lg border border-black/5 dark:border-white/5">
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-black dark:text-white truncate">{event.title}</p>
+                            <p className="text-[10px] text-black/40 dark:text-white/40 mt-0.5">
+                              {new Date(event.startsAt).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                              {event.location && ` · ${event.location}`}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const next = !event.active;
+                              setEventsList((prev) => prev.map((e) => e.id === event.id ? { ...e, active: next } : e));
+                              fetch("/api/admin/events", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "update", eventId: event.id, active: next }),
+                              });
+                            }}
+                            className={`shrink-0 h-7 px-2 rounded-md border text-[10px] font-medium transition-colors ${event.active ? "border-emerald-200 text-emerald-600 bg-emerald-50 dark:border-emerald-800 dark:text-emerald-400 dark:bg-emerald-900/20" : "border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"}`}
+                          >
+                            {event.active ? "Active" : "Paused"}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] text-black/30 dark:text-white/30">
+                            {event.going} going · {event.interested} interested
+                            {event.maxAttendees ? ` · ${event.maxAttendees} max` : ""}
+                          </span>
+                          <button
+                            onClick={async () => {
+                              if (!confirm("Delete this event and all RSVPs?")) return;
+                              await fetch("/api/admin/events", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "delete", eventId: event.id }),
+                              });
+                              setEventsList((prev) => prev.filter((e) => e.id !== event.id));
+                            }}
+                            className="text-[10px] text-red-400 hover:text-red-500 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Create new event */}
+                    <div className="p-3 rounded-lg border border-dashed border-black/15 dark:border-white/15 flex flex-col gap-2">
+                      <input
+                        value={newEventTitle}
+                        onChange={(e) => setNewEventTitle(e.target.value)}
+                        placeholder="Event title"
+                        maxLength={150}
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                      />
+                      <input
+                        value={newEventDesc}
+                        onChange={(e) => setNewEventDesc(e.target.value)}
+                        placeholder="Description (optional)"
+                        maxLength={500}
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                      />
+                      <input
+                        value={newEventLocation}
+                        onChange={(e) => setNewEventLocation(e.target.value)}
+                        placeholder="Location or URL (optional)"
+                        maxLength={200}
+                        className="h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                      />
+                      <div className="flex gap-2">
+                        <div className="flex-1 flex flex-col gap-1">
+                          <label className="text-[10px] text-black/30 dark:text-white/30 uppercase tracking-wider">Start</label>
+                          <input
+                            type="datetime-local"
+                            value={newEventStartsAt}
+                            onChange={(e) => setNewEventStartsAt(e.target.value)}
+                            className="h-7 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-[11px] text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                          />
+                        </div>
+                        <div className="flex-1 flex flex-col gap-1">
+                          <label className="text-[10px] text-black/30 dark:text-white/30 uppercase tracking-wider">End (optional)</label>
+                          <input
+                            type="datetime-local"
+                            value={newEventEndsAt}
+                            onChange={(e) => setNewEventEndsAt(e.target.value)}
+                            className="h-7 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-[11px] text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                          />
+                        </div>
+                      </div>
+                      <input
+                        value={newEventMax}
+                        onChange={(e) => setNewEventMax(e.target.value.replace(/\D/g, ""))}
+                        placeholder="Max attendees (optional, leave blank for unlimited)"
+                        className="h-7 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-[11px] text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!newEventTitle.trim() || !newEventStartsAt) return;
+                          setCreatingEvent(true);
+                          try {
+                            const res = await fetch("/api/admin/events", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                action: "create",
+                                title: newEventTitle,
+                                description: newEventDesc,
+                                location: newEventLocation,
+                                startsAt: new Date(newEventStartsAt).toISOString(),
+                                endsAt: newEventEndsAt ? new Date(newEventEndsAt).toISOString() : null,
+                                maxAttendees: newEventMax || null,
+                              }),
+                            });
+                            const d = await res.json();
+                            if (d.event) {
+                              setEventsList((prev) => [...prev, d.event]);
+                              setNewEventTitle("");
+                              setNewEventDesc("");
+                              setNewEventLocation("");
+                              setNewEventStartsAt("");
+                              setNewEventEndsAt("");
+                              setNewEventMax("");
+                            }
+                          } finally {
+                            setCreatingEvent(false);
+                          }
+                        }}
+                        disabled={creatingEvent || !newEventTitle.trim() || !newEventStartsAt}
+                        className="h-7 w-full rounded-md bg-black dark:bg-white text-white dark:text-black text-[11px] font-medium transition-opacity hover:opacity-80 disabled:opacity-30"
+                      >
+                        {creatingEvent ? "Creating…" : "Create event"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
             {/* Media Gallery section */}
             <Section
               title="Media Gallery"
@@ -1701,6 +2061,11 @@ type BookingRecord = {
   startsAt: string; endsAt: string; status: string; guestTimezone: string;
 };
 
+type TeamMemberRecord = {
+  id: string; name: string; email: string; timezone: string;
+  smsNumber: string; role: string; status: string;
+};
+
 function BookingTab({ profile, username }: { profile: import("@/data/links").Profile; username: string }) {
   const [enabled, setEnabled] = useState(profile.bookingEnabled ?? false);
   const [title, setTitle] = useState(profile.bookingTitle ?? "Book a call");
@@ -1714,6 +2079,15 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [bookingsList, setBookingsList] = useState<BookingRecord[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
 
+  // Team state
+  const [teamEnabled, setTeamEnabled] = useState(profile.teamBookingEnabled ?? false);
+  const [teamStrategy, setTeamStrategy] = useState(profile.teamBookingStrategy ?? "least-busy");
+  const [teamMembersList, setTeamMembersList] = useState<TeamMemberRecord[]>([]);
+  const [teamAvailabilityMap, setTeamAvailabilityMap] = useState<Record<string, AvailabilityWindow[]>>({});
+  const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberEmail, setNewMemberEmail] = useState("");
+  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+
   useEffect(() => {
     setLoadingBookings(true);
     fetch("/api/admin/bookings")
@@ -1721,6 +2095,10 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       .then((d) => {
         setWindows(d.availability || []);
         setBookingsList(d.bookings || []);
+        setTeamMembersList(d.teamMembers || []);
+        setTeamAvailabilityMap(d.teamAvailability || {});
+        if (d.teamBookingEnabled !== undefined) setTeamEnabled(d.teamBookingEnabled);
+        if (d.teamBookingStrategy) setTeamStrategy(d.teamBookingStrategy);
       })
       .finally(() => setLoadingBookings(false));
   }, []);
@@ -1743,11 +2121,11 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        config: { enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber },
+        config: { enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, teamBookingEnabled: teamEnabled, teamBookingStrategy: teamStrategy },
         windows,
       }),
     });
-  }, [enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows]);
+  }, [enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows, teamEnabled, teamStrategy]);
 
   const cancelBooking = async (id: string) => {
     await fetch(`/api/admin/bookings/${id}`, {
@@ -1756,6 +2134,70 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       body: JSON.stringify({ status: "cancelled" }),
     });
     setBookingsList((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b));
+  };
+
+  const addTeamMember = async () => {
+    if (!newMemberName.trim() || !newMemberEmail.trim()) return;
+    const r = await fetch("/api/admin/team", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newMemberName.trim(), email: newMemberEmail.trim(), timezone }),
+    });
+    if (r.ok) {
+      const d = await r.json();
+      setTeamMembersList((prev) => [...prev, {
+        id: d.id, name: newMemberName.trim(), email: newMemberEmail.trim(),
+        timezone, smsNumber: "", role: "member", status: "active",
+      }]);
+      setTeamAvailabilityMap((prev) => ({ ...prev, [d.id]: [] }));
+      setNewMemberName("");
+      setNewMemberEmail("");
+    }
+  };
+
+  const removeTeamMember = async (memberId: string) => {
+    await fetch(`/api/admin/team/${memberId}`, { method: "DELETE" });
+    setTeamMembersList((prev) => prev.filter((m) => m.id !== memberId));
+    setTeamAvailabilityMap((prev) => {
+      const next = { ...prev };
+      delete next[memberId];
+      return next;
+    });
+  };
+
+  const toggleMemberDay = (memberId: string, dow: number) => {
+    setTeamAvailabilityMap((prev) => {
+      const memberWindows = prev[memberId] || [];
+      const existing = memberWindows.find((w) => w.dayOfWeek === dow);
+      const updated = existing
+        ? memberWindows.filter((w) => w.dayOfWeek !== dow)
+        : [...memberWindows, { dayOfWeek: dow, startTime: "09:00", endTime: "17:00" }];
+      return { ...prev, [memberId]: updated };
+    });
+  };
+
+  const updateMemberWindow = (memberId: string, dow: number, field: "startTime" | "endTime", val: string) => {
+    setTeamAvailabilityMap((prev) => {
+      const memberWindows = (prev[memberId] || []).map((w) =>
+        w.dayOfWeek === dow ? { ...w, [field]: val } : w
+      );
+      return { ...prev, [memberId]: memberWindows };
+    });
+  };
+
+  const saveMemberAvailability = async (memberId: string) => {
+    const memberWindows = teamAvailabilityMap[memberId] || [];
+    await fetch(`/api/admin/team/${memberId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ windows: memberWindows }),
+    });
+    setEditingMemberId(null);
+  };
+
+  const getMemberName = (memberId: string | null) => {
+    if (!memberId) return null;
+    return teamMembersList.find((m) => m.id === memberId)?.name || null;
   };
 
   const upcoming = bookingsList.filter((b) => b.status === "confirmed" && new Date(b.startsAt) > new Date());
@@ -1917,6 +2359,150 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
         </Section>
       )}
 
+      {/* Team booking */}
+      {enabled && (
+        <Section title="Team Calendar">
+          <div className="flex flex-col gap-4">
+            {/* Enable team toggle */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-black dark:text-white">Enable shared team calendar</p>
+                <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
+                  Multiple team members share one unified booking calendar
+                </p>
+              </div>
+              <button
+                onClick={() => setTeamEnabled((v) => !v)}
+                className={`relative h-6 w-11 rounded-full transition-colors ${teamEnabled ? "bg-black dark:bg-white" : "bg-black/10 dark:bg-white/10"}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white dark:bg-black shadow transition-transform ${teamEnabled ? "translate-x-5" : "translate-x-0"}`} />
+              </button>
+            </div>
+
+            {teamEnabled && (
+              <>
+                {/* Assignment strategy */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Assignment strategy</label>
+                  <select className={selectClass + " w-full"} value={teamStrategy} onChange={(e) => setTeamStrategy(e.target.value)}>
+                    <option value="least-busy">Least busy (fewest bookings)</option>
+                    <option value="round-robin">Round robin</option>
+                  </select>
+                </div>
+
+                {/* Add member form */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Add team member</label>
+                  <div className="flex gap-2">
+                    <input
+                      className={inputClass + " flex-1"}
+                      placeholder="Name"
+                      value={newMemberName}
+                      onChange={(e) => setNewMemberName(e.target.value)}
+                    />
+                    <input
+                      className={inputClass + " flex-1"}
+                      placeholder="Email"
+                      type="email"
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                    />
+                    <button
+                      onClick={addTeamMember}
+                      disabled={!newMemberName.trim() || !newMemberEmail.trim()}
+                      className="h-8 px-3 rounded-md bg-black dark:bg-white text-white dark:text-black text-xs font-medium disabled:opacity-30 transition-opacity"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+
+                {/* Team members list */}
+                {teamMembersList.filter((m) => m.status === "active").length > 0 && (
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Members</label>
+                    {teamMembersList.filter((m) => m.status === "active").map((member) => (
+                      <div key={member.id} className="rounded-lg border border-black/8 dark:border-white/8 p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-sm font-medium text-black dark:text-white">{member.name}</p>
+                            <p className="text-xs text-black/40 dark:text-white/40">{member.email}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setEditingMemberId(editingMemberId === member.id ? null : member.id)}
+                              className="text-[10px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors"
+                            >
+                              {editingMemberId === member.id ? "Close" : "Schedule"}
+                            </button>
+                            <button
+                              onClick={() => removeTeamMember(member.id)}
+                              className="text-[10px] text-red-400 hover:text-red-500 transition-colors"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Inline availability editor */}
+                        {editingMemberId === member.id && (
+                          <div className="flex flex-col gap-2 pt-2 border-t border-black/5 dark:border-white/5">
+                            {DAY_LABELS.map((label, dow) => {
+                              const memberWindows = teamAvailabilityMap[member.id] || [];
+                              const win = memberWindows.find((w) => w.dayOfWeek === dow);
+                              const active = !!win;
+                              return (
+                                <div key={dow} className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => toggleMemberDay(member.id, dow)}
+                                    className={`w-10 text-xs font-medium rounded-md px-1 py-1 transition-colors ${
+                                      active
+                                        ? "bg-black dark:bg-white text-white dark:text-black"
+                                        : "border border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"
+                                    }`}
+                                  >
+                                    {label}
+                                  </button>
+                                  {active && win ? (
+                                    <div className="flex items-center gap-2 flex-1">
+                                      <input
+                                        type="time"
+                                        value={win.startTime}
+                                        onChange={(e) => updateMemberWindow(member.id, dow, "startTime", e.target.value)}
+                                        className={inputClass}
+                                      />
+                                      <span className="text-xs text-black/30 dark:text-white/30">–</span>
+                                      <input
+                                        type="time"
+                                        value={win.endTime}
+                                        onChange={(e) => updateMemberWindow(member.id, dow, "endTime", e.target.value)}
+                                        className={inputClass}
+                                      />
+                                    </div>
+                                  ) : (
+                                    <span className="text-xs text-black/20 dark:text-white/20">Unavailable</span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                            <button
+                              onClick={() => saveMemberAvailability(member.id)}
+                              className="mt-1 h-7 px-3 rounded-md bg-black dark:bg-white text-white dark:text-black text-xs font-medium self-end transition-opacity"
+                            >
+                              Save schedule
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </Section>
+      )}
+
       {/* Upcoming bookings */}
       {enabled && (
         <Section title={`Upcoming (${upcoming.length})`}>
@@ -1935,6 +2521,11 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
                     <p className="text-xs text-black/40 dark:text-white/40 truncate">{b.guestEmail}</p>
                     <p className="text-xs text-black/50 dark:text-white/50 mt-0.5">{formatBookingTime(b.startsAt)}</p>
                     {b.notes && <p className="text-xs text-black/30 dark:text-white/30 mt-1 italic">{b.notes}</p>}
+                    {(b as any).teamMemberId && getMemberName((b as any).teamMemberId) && (
+                      <p className="text-[10px] text-black/40 dark:text-white/40 mt-1">
+                        Assigned to <span className="font-medium">{getMemberName((b as any).teamMemberId)}</span>
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => cancelBooking(b.id)}

@@ -114,3 +114,98 @@ export function getDayOfWeek(dateStr: string, tz: string): number {
   const label = d.toLocaleDateString("en-US", { timeZone: tz, weekday: "short" });
   return days.indexOf(label);
 }
+
+// --- Team booking helpers ---
+
+export type TeamMemberSlotInfo = {
+  memberId: string;
+  windows: AvailabilityWindow[];
+  existing: ExistingBooking[];
+  timezone: string;
+};
+
+export type TeamSlot = {
+  startsAt: Date;
+  availableMembers: string[]; // member IDs who can take this slot
+};
+
+/**
+ * Generate merged available slots across all team members.
+ * Returns the union of all members' available times, with metadata
+ * about which members are free at each slot.
+ */
+export function generateTeamSlots(
+  dateStr: string,
+  members: TeamMemberSlotInfo[],
+  durationMins: number,
+  bufferMins: number,
+): TeamSlot[] {
+  // Generate slots per member using their own timezone + availability
+  const slotMap = new Map<number, string[]>(); // timestamp → member IDs
+
+  for (const member of members) {
+    const memberSlots = generateSlots(
+      dateStr,
+      member.windows,
+      member.existing,
+      durationMins,
+      bufferMins,
+      member.timezone,
+    );
+
+    for (const slot of memberSlots) {
+      const ts = slot.getTime();
+      const existing = slotMap.get(ts);
+      if (existing) {
+        existing.push(member.memberId);
+      } else {
+        slotMap.set(ts, [member.memberId]);
+      }
+    }
+  }
+
+  // Convert to sorted array
+  return Array.from(slotMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([ts, memberIds]) => ({
+      startsAt: new Date(ts),
+      availableMembers: memberIds,
+    }));
+}
+
+/**
+ * Pick the best team member for a slot based on assignment strategy.
+ */
+export function pickTeamMember(
+  availableMembers: string[],
+  strategy: "least-busy" | "round-robin",
+  bookingCounts: Map<string, number>, // memberId → confirmed booking count
+): string {
+  if (availableMembers.length === 1) return availableMembers[0];
+
+  if (strategy === "least-busy") {
+    // Pick the member with fewest confirmed bookings
+    let bestId = availableMembers[0];
+    let bestCount = bookingCounts.get(bestId) ?? 0;
+    for (const id of availableMembers) {
+      const count = bookingCounts.get(id) ?? 0;
+      if (count < bestCount) {
+        bestId = id;
+        bestCount = count;
+      }
+    }
+    return bestId;
+  }
+
+  // round-robin: same logic (fewest bookings = next in rotation)
+  let bestId = availableMembers[0];
+  let bestCount = bookingCounts.get(bestId) ?? 0;
+  for (const id of availableMembers) {
+    const count = bookingCounts.get(id) ?? 0;
+    if (count < bestCount) {
+      bestId = id;
+      bestCount = count;
+    }
+  }
+  return bestId;
+}

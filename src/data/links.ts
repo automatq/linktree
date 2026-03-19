@@ -40,6 +40,8 @@ export type Profile = {
   bookingEmail?: string;
   bookingTimezone?: string;
   bookingSmsNumber?: string;
+  teamBookingEnabled?: boolean;
+  teamBookingStrategy?: string;
   socialLinksPosition?: "footer" | "bio";
   customDomain?: string;
   tipJarEnabled?: boolean;

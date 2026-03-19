@@ -32,6 +32,9 @@ export const profiles = pgTable("profiles", {
   bookingEmail: text("booking_email").notNull().default(""),
   bookingTimezone: text("booking_timezone").notNull().default("UTC"),
   bookingSmsNumber: text("booking_sms_number").notNull().default(""),
+  // Team booking
+  teamBookingEnabled: boolean("team_booking_enabled").notNull().default(false),
+  teamBookingStrategy: text("team_booking_strategy").notNull().default("least-busy"), // "round-robin" | "least-busy"
   socialLinksPosition: text("social_links_position").notNull().default("footer"), // "footer" | "bio"
   customDomain: text("custom_domain").notNull().default(""),
   tipJarEnabled: boolean("tip_jar_enabled").notNull().default(false),
@@ -69,6 +72,10 @@ export const profiles = pgTable("profiles", {
   voiceRoomsEnabled: boolean("voice_rooms_enabled").notNull().default(false),
   // Reviews
   reviewsEnabled: boolean("reviews_enabled").notNull().default(false),
+  // Polls
+  pollsEnabled: boolean("polls_enabled").notNull().default(false),
+  // Events
+  eventsEnabled: boolean("events_enabled").notNull().default(false),
   usernameChangedAt: timestamp("username_changed_at"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [
@@ -298,10 +305,119 @@ export const reviews = pgTable("reviews", {
   index("reviews_author_profile_id_idx").on(t.authorProfileId),
 ]);
 
+// Polls — community polls on a creator's profile
+export const polls = pgTable("polls", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  question: text("question").notNull(),
+  active: boolean("active").notNull().default(true),
+  multipleChoice: boolean("multiple_choice").notNull().default(false), // allow selecting multiple options
+  endsAt: timestamp("ends_at"), // optional deadline
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("polls_profile_id_idx").on(t.profileId),
+]);
+
+// Poll options — choices for a poll
+export const pollOptions = pgTable("poll_options", {
+  id: text("id").primaryKey(),
+  pollId: text("poll_id").notNull().references(() => polls.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  position: integer("position").notNull().default(0),
+}, (t) => [
+  index("poll_options_poll_id_idx").on(t.pollId),
+]);
+
+// Poll votes — one vote per user per poll (or per option if multipleChoice)
+export const pollVotes = pgTable("poll_votes", {
+  id: text("id").primaryKey(),
+  pollId: text("poll_id").notNull().references(() => polls.id, { onDelete: "cascade" }),
+  optionId: text("option_id").notNull().references(() => pollOptions.id, { onDelete: "cascade" }),
+  voterProfileId: integer("voter_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("poll_votes_poll_id_idx").on(t.pollId),
+  index("poll_votes_voter_profile_idx").on(t.pollId, t.voterProfileId),
+]);
+
+// Reactions — emoji reactions on community content
+export const reactions = pgTable("reactions", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }), // profile that owns the content
+  targetType: text("target_type").notNull(), // "wall_note" | "voice_note" | "review" | "poll"
+  targetId: text("target_id").notNull(),
+  emoji: text("emoji").notNull(), // emoji character
+  reactorProfileId: integer("reactor_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("reactions_target_idx").on(t.targetType, t.targetId),
+  index("reactions_reactor_idx").on(t.targetType, t.targetId, t.reactorProfileId),
+]);
+
+// Events — community events with RSVP
+export const events = pgTable("events", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  location: text("location").notNull().default(""), // venue, URL, or "Online"
+  coverUrl: text("cover_url").notNull().default(""),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  maxAttendees: integer("max_attendees"), // null = unlimited
+  active: boolean("active").notNull().default(true),
+  position: integer("position").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("events_profile_id_idx").on(t.profileId),
+]);
+
+// Event RSVPs
+export const eventRsvps = pgTable("event_rsvps", {
+  id: text("id").primaryKey(),
+  eventId: text("event_id").notNull().references(() => events.id, { onDelete: "cascade" }),
+  attendeeProfileId: integer("attendee_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  status: text("status").notNull().default("going"), // "going" | "interested"
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("event_rsvps_event_id_idx").on(t.eventId),
+  index("event_rsvps_attendee_idx").on(t.eventId, t.attendeeProfileId),
+]);
+
+// Team members — multiple users linked to one profile for shared booking
+export const teamMembers = pgTable("team_members", {
+  id: text("id").primaryKey(), // UUID
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  userId: text("user_id").notNull(), // Clerk userId
+  name: text("name").notNull().default(""),
+  email: text("email").notNull().default(""),
+  smsNumber: text("sms_number").notNull().default(""),
+  timezone: text("timezone").notNull().default("UTC"),
+  role: text("role").notNull().default("member"), // "owner" | "member"
+  status: text("status").notNull().default("active"), // "active" | "invited" | "removed"
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("team_members_profile_id_idx").on(t.profileId),
+  index("team_members_user_id_idx").on(t.userId),
+]);
+
+// Per-member weekly availability windows
+export const teamAvailability = pgTable("team_availability", {
+  id: serial("id").primaryKey(),
+  teamMemberId: text("team_member_id").notNull().references(() => teamMembers.id, { onDelete: "cascade" }),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Sun…6=Sat
+  startTime: text("start_time").notNull(), // "HH:MM"
+  endTime: text("end_time").notNull(),     // "HH:MM"
+}, (t) => [
+  index("team_availability_member_id_idx").on(t.teamMemberId),
+]);
+
 // Individual bookings
 export const bookings = pgTable("bookings", {
   id: text("id").primaryKey(),
   profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  teamMemberId: text("team_member_id"), // nullable — assigned team member (null for solo profiles)
   guestName: text("guest_name").notNull(),
   guestEmail: text("guest_email").notNull(),
   startsAt: timestamp("starts_at").notNull(),
