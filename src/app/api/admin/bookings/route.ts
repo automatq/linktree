@@ -16,25 +16,62 @@ export async function GET() {
     db.select().from(availability).where(eq(availability.profileId, profile.id)),
   ]);
 
-  // Load groups for the group picker
+  // Load groups the user OWNS (for the group picker)
   const userGroups = await db.select().from(groups).where(eq(groups.profileId, profile.id));
 
-  // For each group, get accepted member count
   const groupsWithCounts = await Promise.all(
     userGroups.map(async (g) => {
       const members = await db.select().from(groupMembers).where(
         and(eq(groupMembers.groupId, g.id), eq(groupMembers.status, "accepted"))
       );
-      // Get member names for display
       const memberProfiles = await Promise.all(
         members.map(async (m) => {
           const p = await db.query.profiles.findFirst({ where: eq(profiles.id, m.memberProfileId) });
-          return { profileId: m.memberProfileId, name: p?.name || "" };
+          return { profileId: m.memberProfileId, name: p?.name || "", role: m.role || "member" };
         })
       );
       return { id: g.id, name: g.name, memberCount: members.length, members: memberProfiles };
     })
   );
+
+  // Check if user is a MEMBER of any group that's linked as a shared calendar
+  let linkedCalendar: { groupName: string; ownerName: string; ownerUsername: string; members: { name: string; role: string }[]; myRole: string } | null = null;
+
+  const myMemberships = await db.select().from(groupMembers).where(
+    and(eq(groupMembers.memberProfileId, profile.id), eq(groupMembers.status, "accepted"))
+  );
+
+  for (const membership of myMemberships) {
+    // Find the group
+    const group = await db.select().from(groups).where(eq(groups.id, membership.groupId));
+    if (!group[0]) continue;
+
+    // Check if the group owner has this group linked as their booking calendar
+    const ownerProfile = await db.query.profiles.findFirst({ where: eq(profiles.id, group[0].profileId) });
+    if (!ownerProfile || ownerProfile.bookingGroupId !== group[0].id) continue;
+
+    // This group IS linked as a shared calendar — build the info
+    const allMembers = await db.select().from(groupMembers).where(
+      and(eq(groupMembers.groupId, group[0].id), eq(groupMembers.status, "accepted"))
+    );
+    const memberNames = await Promise.all(
+      allMembers.map(async (m) => {
+        const p = await db.query.profiles.findFirst({ where: eq(profiles.id, m.memberProfileId) });
+        return { name: p?.name || "", role: m.role || "member" };
+      })
+    );
+    // Include the owner
+    memberNames.unshift({ name: ownerProfile.name, role: "owner" });
+
+    linkedCalendar = {
+      groupName: group[0].name,
+      ownerName: ownerProfile.name,
+      ownerUsername: ownerProfile.username,
+      members: memberNames,
+      myRole: membership.role || "member",
+    };
+    break; // only one linked calendar matters
+  }
 
   // Resolve assigned member names for bookings
   const bookingsWithAssignment = await Promise.all(
@@ -80,6 +117,7 @@ export async function GET() {
       smsNumber: profile.bookingSmsNumber,
       reminderRules: (() => { try { return JSON.parse(profile.bookingReminderRules || "[]"); } catch { return []; } })(),
     },
+    linkedCalendar,
   });
 }
 

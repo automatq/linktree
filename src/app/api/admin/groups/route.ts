@@ -45,6 +45,7 @@ export async function GET() {
           id: groupMembers.id,
           position: groupMembers.position,
           status: groupMembers.status,
+          role: groupMembers.role,
           profileId: profiles.id,
           username: profiles.username,
           name: profiles.name,
@@ -164,6 +165,26 @@ export async function POST(req: NextRequest) {
     await db
       .delete(groupMembers)
       .where(and(eq(groupMembers.id, body.memberId), eq(groupMembers.groupId, body.groupId)));
+    return NextResponse.json({ ok: true });
+  }
+
+  // Set member role (admin/member) — only group owner can do this
+  if (action === "setRole") {
+    const { memberId, role } = body;
+    if (!["admin", "member"].includes(role)) {
+      return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+    }
+
+    // Verify the member is in a group owned by this user
+    const member = await db.select().from(groupMembers).where(eq(groupMembers.id, memberId));
+    if (member.length === 0) return NextResponse.json({ error: "Member not found" }, { status: 404 });
+
+    const group = await db.query.groups.findFirst({
+      where: and(eq(groups.id, member[0].groupId), eq(groups.profileId, profile.id)),
+    });
+    if (!group) return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+
+    await db.update(groupMembers).set({ role }).where(eq(groupMembers.id, memberId));
     return NextResponse.json({ ok: true });
   }
 

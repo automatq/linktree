@@ -243,6 +243,7 @@ export const groupMembers = pgTable("group_members", {
   groupId: text("group_id").notNull().references(() => groups.id, { onDelete: "cascade" }),
   memberProfileId: integer("member_profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
   status: text("status").notNull().default("pending"), // "pending" | "accepted" | "declined"
+  role: text("role").notNull().default("member"), // "member" | "admin"
   position: integer("position").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => [

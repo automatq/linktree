@@ -2089,6 +2089,8 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [configLoaded, setConfigLoaded] = useState(false);
   type ReminderRule = { minutesBefore: number; channels: string[]; parties: string[] };
   const [reminderRules, setReminderRules] = useState<ReminderRule[]>([]);
+  type LinkedCalendarInfo = { groupName: string; ownerName: string; ownerUsername: string; members: { name: string; role: string }[]; myRole: string };
+  const [linkedCalendar, setLinkedCalendar] = useState<LinkedCalendarInfo | null>(null);
 
   useEffect(() => {
     setLoadingBookings(true);
@@ -2114,6 +2116,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
           setSmsNumber(d.config.smsNumber ?? "");
           if (d.config.reminderRules) setReminderRules(d.config.reminderRules);
         }
+        if (d.linkedCalendar) setLinkedCalendar(d.linkedCalendar);
         setConfigLoaded(true);
       })
       .finally(() => setLoadingBookings(false));
@@ -2607,7 +2610,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
         </Section>
       )}
 
-      {/* Shared group calendar */}
+      {/* Shared group calendar — owner view */}
       {enabled && availableGroups.length > 0 && (
         <Section title="Shared Calendar">
           <div className="flex flex-col gap-4">
@@ -2632,7 +2635,6 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
 
             {bookingGroupId && (
               <>
-                {/* Assignment strategy */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Assignment strategy</label>
                   <select className={selectClass + " w-full"} value={bookingStrategy} onChange={(e) => setBookingStrategy(e.target.value)}>
@@ -2641,25 +2643,66 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
                   </select>
                 </div>
 
-                {/* Show linked members */}
                 {selectedGroup && selectedGroup.members.length > 0 && (
                   <div className="flex flex-col gap-1.5">
                     <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Members sharing this calendar</label>
                     {selectedGroup.members.map((m) => (
-                      <div key={m.profileId} className="flex items-center gap-2 rounded-md border border-black/5 dark:border-white/5 px-3 py-2">
-                        <div className="h-5 w-5 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-[9px] font-bold text-black/40 dark:text-white/40">
-                          {m.name.charAt(0).toUpperCase()}
+                      <div key={m.profileId} className="flex items-center justify-between rounded-md border border-black/5 dark:border-white/5 px-3 py-2">
+                        <div className="flex items-center gap-2">
+                          <div className="h-5 w-5 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-[9px] font-bold text-black/40 dark:text-white/40">
+                            {m.name.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="text-xs text-black dark:text-white">{m.name}</span>
                         </div>
-                        <span className="text-xs text-black dark:text-white">{m.name}</span>
+                        {(m as any).role === "admin" && (
+                          <span className="text-[9px] font-medium uppercase tracking-wider text-emerald-500">Admin</span>
+                        )}
                       </div>
                     ))}
                     <p className="text-[11px] text-black/30 dark:text-white/30 mt-1">
-                      Each member sets their own availability in the Booking tab of their admin panel. Manage members in the Groups tab.
+                      Manage members and roles in the Groups tab.
                     </p>
                   </div>
                 )}
               </>
             )}
+          </div>
+        </Section>
+      )}
+
+      {/* Shared group calendar — member view (read-only) */}
+      {enabled && !availableGroups.length && linkedCalendar && (
+        <Section title="Shared Calendar">
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-medium text-black dark:text-white">
+                {linkedCalendar.groupName}
+              </p>
+              <p className="text-xs text-black/40 dark:text-white/40 mt-0.5">
+                Managed by {linkedCalendar.ownerName} · Your role: <span className="font-medium">{linkedCalendar.myRole === "admin" ? "Admin" : "Member"}</span>
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30">Team</label>
+              {linkedCalendar.members.map((m, i) => (
+                <div key={i} className="flex items-center justify-between rounded-md border border-black/5 dark:border-white/5 px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className="h-5 w-5 rounded-full bg-black/10 dark:bg-white/10 flex items-center justify-center text-[9px] font-bold text-black/40 dark:text-white/40">
+                      {m.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-xs text-black dark:text-white">{m.name}</span>
+                  </div>
+                  <span className="text-[9px] font-medium uppercase tracking-wider text-black/25 dark:text-white/25">
+                    {m.role === "owner" ? "Owner" : m.role === "admin" ? "Admin" : ""}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-[11px] text-black/30 dark:text-white/30">
+              Your availability and blocked dates above contribute to the shared calendar at /book/{linkedCalendar.ownerUsername}.
+            </p>
           </div>
         </Section>
       )}
@@ -3415,6 +3458,21 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
     );
   }
 
+  async function toggleMemberRole(memberId: string, currentRole: string) {
+    const newRole = currentRole === "admin" ? "member" : "admin";
+    await fetch("/api/admin/groups", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "setRole", memberId, role: newRole }),
+    });
+    setGroupsList((prev) =>
+      prev.map((g) => ({
+        ...g,
+        members: g.members.map((m) => m.id === memberId ? { ...m, role: newRole } : m),
+      }))
+    );
+  }
+
   async function respondToInvite(memberId: string, response: "accepted" | "declined") {
     await fetch("/api/admin/groups", {
       method: "POST",
@@ -3549,12 +3607,26 @@ function GroupsTab({ profile }: { profile: import("@/data/links").Profile }) {
                           </div>
                           <p className="text-xs text-black/40 dark:text-white/40">@{m.username}</p>
                         </div>
-                        <button
-                          onClick={() => removeMember(group.id, m.id)}
-                          className="shrink-0 text-xs text-red-400 hover:text-red-500 transition-colors"
-                        >
-                          Remove
-                        </button>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {m.status === "accepted" && (
+                            <button
+                              onClick={() => toggleMemberRole(m.id, (m as any).role || "member")}
+                              className={`text-[10px] font-medium px-1.5 py-0.5 rounded transition-colors ${
+                                (m as any).role === "admin"
+                                  ? "text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/30 hover:bg-emerald-200 dark:hover:bg-emerald-900/50"
+                                  : "text-black/30 dark:text-white/30 hover:text-black/50 dark:hover:text-white/50"
+                              }`}
+                            >
+                              {(m as any).role === "admin" ? "Admin" : "Make admin"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => removeMember(group.id, m.id)}
+                            className="text-xs text-red-400 hover:text-red-500 transition-colors"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
