@@ -386,6 +386,18 @@ export const eventRsvps = pgTable("event_rsvps", {
   index("event_rsvps_attendee_idx").on(t.eventId, t.attendeeProfileId),
 ]);
 
+// Blocked dates — specific days a profile owner marks as unavailable
+export const blockedDates = pgTable("blocked_dates", {
+  id: serial("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  date: text("date").notNull(), // "YYYY-MM-DD"
+  reason: text("reason").notNull().default(""),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("blocked_dates_profile_id_idx").on(t.profileId),
+  index("blocked_dates_profile_date_idx").on(t.profileId, t.date),
+]);
+
 // Individual bookings
 export const bookings = pgTable("bookings", {
   id: text("id").primaryKey(),

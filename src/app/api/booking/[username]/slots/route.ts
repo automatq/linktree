@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { db } from "@/db";
-import { profiles, availability, bookings, groups, groupMembers } from "@/db/schema";
+import { profiles, availability, bookings, groups, groupMembers, blockedDates } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { generateSlots, generateGroupSlots, utcToLocalDate, getDayOfWeek } from "@/lib/slots";
 import type { GroupMemberSlotInfo } from "@/lib/slots";
@@ -93,15 +93,22 @@ export async function GET(
   // --- Available dates (no date param) ---
   if (!date) {
     if (isGroupMode) {
-      // Union of all group members' available days
-      const allDays = new Set<number>();
+      // Load availability + blocked dates per member
+      const memberData: { profileId: number; days: Set<number>; blocked: Set<string> }[] = [];
       for (const member of acceptedMembers) {
-        const memberWindows = await db.select().from(availability).where(
-          eq(availability.profileId, member.profileId)
-        );
-        memberWindows.forEach((w) => allDays.add(w.dayOfWeek));
+        const [memberWindows, memberBlocked] = await Promise.all([
+          db.select().from(availability).where(eq(availability.profileId, member.profileId)),
+          db.select().from(blockedDates).where(eq(blockedDates.profileId, member.profileId)),
+        ]);
+        memberData.push({
+          profileId: member.profileId,
+          days: new Set(memberWindows.map((w) => w.dayOfWeek)),
+          blocked: new Set(memberBlocked.map((b) => b.date)),
+        });
       }
 
+      const allDays = new Set<number>();
+      memberData.forEach((m) => m.days.forEach((d) => allDays.add(d)));
       if (allDays.size === 0) return NextResponse.json({ dates: [], timezone: tz });
 
       const dates: string[] = [];
@@ -110,24 +117,31 @@ export async function GET(
         const d = new Date(now.getTime() + i * 86400000);
         const dateStr = utcToLocalDate(d, tz);
         const dow = getDayOfWeek(dateStr, tz);
-        if (allDays.has(dow)) dates.push(dateStr);
+        if (!allDays.has(dow)) continue;
+        // Date is available if at least one member has the dow AND hasn't blocked it
+        const anyAvailable = memberData.some((m) => m.days.has(dow) && !m.blocked.has(dateStr));
+        if (anyAvailable) dates.push(dateStr);
       }
 
       return NextResponse.json({ dates, timezone: tz });
     }
 
     // Solo mode
-    const windows = await db.select().from(availability).where(eq(availability.profileId, profile.id));
+    const [windows, blocked] = await Promise.all([
+      db.select().from(availability).where(eq(availability.profileId, profile.id)),
+      db.select().from(blockedDates).where(eq(blockedDates.profileId, profile.id)),
+    ]);
     if (windows.length === 0) return NextResponse.json({ dates: [] });
 
     const availableDays = new Set(windows.map((w) => w.dayOfWeek));
+    const blockedSet = new Set(blocked.map((b) => b.date));
     const dates: string[] = [];
     const now = new Date();
     for (let i = 1; i <= advanceDays; i++) {
       const d = new Date(now.getTime() + i * 86400000);
       const dateStr = utcToLocalDate(d, tz);
       const dow = getDayOfWeek(dateStr, tz);
-      if (availableDays.has(dow)) dates.push(dateStr);
+      if (availableDays.has(dow) && !blockedSet.has(dateStr)) dates.push(dateStr);
     }
 
     return NextResponse.json({ dates, timezone: tz });
@@ -141,6 +155,12 @@ export async function GET(
     const memberSlotInfos: GroupMemberSlotInfo[] = [];
 
     for (const member of acceptedMembers) {
+      // Skip members who blocked this date
+      const memberBlocked = await db.select().from(blockedDates).where(
+        and(eq(blockedDates.profileId, member.profileId), eq(blockedDates.date, date))
+      );
+      if (memberBlocked.length > 0) continue;
+
       const memberProfile = await db.query.profiles.findFirst({
         where: eq(profiles.id, member.profileId),
       });
@@ -179,7 +199,14 @@ export async function GET(
     });
   }
 
-  // Solo mode
+  // Solo mode — check if date is blocked
+  const isBlocked = await db.select().from(blockedDates).where(
+    and(eq(blockedDates.profileId, profile.id), eq(blockedDates.date, date))
+  );
+  if (isBlocked.length > 0) {
+    return NextResponse.json({ slots: [], duration, timezone: tz });
+  }
+
   const windows = await db.select().from(availability).where(eq(availability.profileId, profile.id));
   const existing = await db.select().from(bookings).where(
     and(

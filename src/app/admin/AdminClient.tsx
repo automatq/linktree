@@ -2084,6 +2084,8 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [bookingStrategy, setBookingStrategy] = useState(profile.bookingStrategy ?? "least-busy");
   const [availableGroups, setAvailableGroups] = useState<BookingGroup[]>([]);
   const [embedSites, setEmbedSites] = useState<{ origin: string; lastSeen: string }[]>([]);
+  const [blockedDatesSet, setBlockedDatesSet] = useState<Set<string>>(new Set());
+  const [calMonth, setCalMonth] = useState(() => ({ year: new Date().getFullYear(), month: new Date().getMonth() }));
 
   useEffect(() => {
     setLoadingBookings(true);
@@ -2091,6 +2093,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       .then((r) => r.json())
       .then((d) => {
         setWindows(d.availability || []);
+        if (d.blockedDates) setBlockedDatesSet(new Set(d.blockedDates));
         setBookingsList(d.bookings || []);
         setAvailableGroups(d.groups || []);
         if (d.bookingGroupId !== undefined) setBookingGroupId(d.bookingGroupId);
@@ -2154,6 +2157,24 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
     });
     setBookingsList((prev) => prev.map((b) => b.id === id ? { ...b, status: "cancelled" } : b));
   };
+
+  const toggleBlockedDate = async (dateStr: string) => {
+    const isCurrentlyBlocked = blockedDatesSet.has(dateStr);
+    // Optimistic update
+    setBlockedDatesSet((prev) => {
+      const next = new Set(prev);
+      if (isCurrentlyBlocked) next.delete(dateStr); else next.add(dateStr);
+      return next;
+    });
+    await fetch("/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ date: dateStr, blocked: !isCurrentlyBlocked }),
+    });
+  };
+
+  const CAL_MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const CAL_DAY_NAMES = ["Su","Mo","Tu","We","Th","Fr","Sa"];
 
   const selectedGroup = availableGroups.find((g) => g.id === bookingGroupId);
 
@@ -2330,6 +2351,111 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
                 </div>
               );
             })}
+          </div>
+        </Section>
+      )}
+
+      {/* Block off dates calendar */}
+      {enabled && (
+        <Section title="Block Off Dates">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-black/40 dark:text-white/40">
+              Click dates to block them off. Blocked dates won&apos;t show as available on your booking calendar.
+            </p>
+
+            {/* Month nav */}
+            <div className="flex items-center justify-between">
+              <button
+                onClick={() => setCalMonth((m) => {
+                  const d = new Date(m.year, m.month - 1, 1);
+                  return { year: d.getFullYear(), month: d.getMonth() };
+                })}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-black/30 hover:text-black dark:text-white/30 dark:hover:text-white transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+              </button>
+              <span className="text-sm font-semibold text-black dark:text-white">
+                {CAL_MONTH_NAMES[calMonth.month]} {calMonth.year}
+              </span>
+              <button
+                onClick={() => setCalMonth((m) => {
+                  const d = new Date(m.year, m.month + 1, 1);
+                  return { year: d.getFullYear(), month: d.getMonth() };
+                })}
+                className="flex h-7 w-7 items-center justify-center rounded-md text-black/30 hover:text-black dark:text-white/30 dark:hover:text-white transition-colors"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+              </button>
+            </div>
+
+            {/* Day headers */}
+            <div className="grid grid-cols-7">
+              {CAL_DAY_NAMES.map((d) => (
+                <div key={d} className="text-center text-[10px] font-medium text-black/30 dark:text-white/30 py-1">{d}</div>
+              ))}
+            </div>
+
+            {/* Date grid */}
+            <div className="grid grid-cols-7 gap-1">
+              {(() => {
+                const firstDay = new Date(calMonth.year, calMonth.month, 1).getDay();
+                const daysInMonth = new Date(calMonth.year, calMonth.month + 1, 0).getDate();
+                const today = new Date().toLocaleDateString("sv-SE");
+                const cells = [];
+
+                for (let i = 0; i < firstDay; i++) {
+                  cells.push(<div key={`e-${i}`} />);
+                }
+
+                for (let day = 1; day <= daysInMonth; day++) {
+                  const dateStr = `${calMonth.year}-${String(calMonth.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+                  const isPast = dateStr < today;
+                  const isBlocked = blockedDatesSet.has(dateStr);
+                  const isToday = dateStr === today;
+                  // Check if this day has a booking
+                  const hasBooking = bookingsList.some((b) => b.status === "confirmed" && b.startsAt.startsWith(dateStr));
+
+                  cells.push(
+                    <button
+                      key={day}
+                      disabled={isPast}
+                      onClick={() => !isPast && toggleBlockedDate(dateStr)}
+                      className={`relative flex items-center justify-center h-9 w-full rounded-lg text-xs font-medium transition-all ${
+                        isPast
+                          ? "text-black/15 dark:text-white/15 cursor-not-allowed"
+                          : isBlocked
+                            ? "bg-red-500/15 text-red-500 dark:text-red-400 line-through"
+                            : isToday
+                              ? "ring-1 ring-black/20 dark:ring-white/20 text-black dark:text-white"
+                              : "text-black/70 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      {day}
+                      {hasBooking && !isBlocked && (
+                        <span className="absolute bottom-1 left-1/2 -translate-x-1/2 h-1 w-1 rounded-full bg-emerald-400" />
+                      )}
+                      {isBlocked && !isPast && (
+                        <span className="absolute top-0.5 right-0.5 text-[8px] text-red-400">✕</span>
+                      )}
+                    </button>
+                  );
+                }
+
+                return cells;
+              })()}
+            </div>
+
+            {/* Legend */}
+            <div className="flex items-center gap-4 pt-1">
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-red-500/30" />
+                <span className="text-[10px] text-black/30 dark:text-white/30">Blocked</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                <span className="text-[10px] text-black/30 dark:text-white/30">Has booking</span>
+              </div>
+            </div>
           </div>
         </Section>
       )}

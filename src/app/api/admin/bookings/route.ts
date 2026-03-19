@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { profiles, bookings, availability, groups, groupMembers } from "@/db/schema";
+import { profiles, bookings, availability, groups, groupMembers, blockedDates } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 
 export async function GET() {
@@ -58,6 +58,9 @@ export async function GET() {
   let embedSites: { origin: string; lastSeen: string }[] = [];
   try { embedSites = JSON.parse(profile.bookingEmbedSites || "[]"); } catch {}
 
+  // Load blocked dates
+  const userBlockedDates = await db.select().from(blockedDates).where(eq(blockedDates.profileId, profile.id));
+
   return NextResponse.json({
     bookings: bookingsWithAssignment,
     availability: userAvailability,
@@ -65,6 +68,7 @@ export async function GET() {
     bookingGroupId: profile.bookingGroupId || "",
     bookingStrategy: profile.bookingStrategy || "least-busy",
     embedSites,
+    blockedDates: userBlockedDates.map((b) => b.date),
   });
 }
 
@@ -105,6 +109,36 @@ export async function POST(req: Request) {
         startTime: w.startTime,
         endTime: w.endTime,
       }))
+    );
+  }
+
+  return NextResponse.json({ ok: true });
+}
+
+// Toggle a blocked date on/off
+export async function PATCH(req: Request) {
+  const { userId } = await auth();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { date, blocked } = body; // date: "YYYY-MM-DD", blocked: boolean
+
+  if (!date) return NextResponse.json({ error: "Date required" }, { status: 400 });
+
+  const profile = await db.query.profiles.findFirst({ where: eq(profiles.userId, userId) });
+  if (!profile) return NextResponse.json({ error: "Profile not found" }, { status: 404 });
+
+  if (blocked) {
+    // Check if already blocked
+    const existing = await db.select().from(blockedDates).where(
+      and(eq(blockedDates.profileId, profile.id), eq(blockedDates.date, date))
+    );
+    if (existing.length === 0) {
+      await db.insert(blockedDates).values({ profileId: profile.id, date });
+    }
+  } else {
+    await db.delete(blockedDates).where(
+      and(eq(blockedDates.profileId, profile.id), eq(blockedDates.date, date))
     );
   }
 
