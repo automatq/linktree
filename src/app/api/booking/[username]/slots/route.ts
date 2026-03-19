@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { db } from "@/db";
 import { profiles, availability, bookings, groups, groupMembers } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
@@ -7,6 +7,40 @@ import type { GroupMemberSlotInfo } from "@/lib/slots";
 
 export async function OPTIONS() {
   return new Response(null, { status: 204 });
+}
+
+/**
+ * Track the origin of booking API requests (referer/origin header).
+ * Stores up to 20 unique origins with last-seen timestamp.
+ */
+function trackEmbedSite(profile: { id: number; bookingEmbedSites: string }, origin: string | null) {
+  if (!origin) return;
+  try {
+    const url = new URL(origin);
+    const site = url.origin; // e.g. "https://www.axiomflow.ca"
+    // Skip same-site requests (trilink itself)
+    if (site.includes("trilink") || site.includes("localhost") || site.includes("127.0.0.1")) return;
+
+    const existing: { origin: string; lastSeen: string }[] = JSON.parse(profile.bookingEmbedSites || "[]");
+    const now = new Date().toISOString();
+    const idx = existing.findIndex((e) => e.origin === site);
+
+    if (idx >= 0) {
+      // Only update if last seen more than 1 hour ago (avoid spamming DB)
+      const lastSeen = new Date(existing[idx].lastSeen).getTime();
+      if (Date.now() - lastSeen < 3600000) return;
+      existing[idx].lastSeen = now;
+    } else {
+      existing.push({ origin: site, lastSeen: now });
+      if (existing.length > 20) existing.shift(); // cap at 20
+    }
+
+    db.update(profiles)
+      .set({ bookingEmbedSites: JSON.stringify(existing) })
+      .where(eq(profiles.id, profile.id))
+      .then(() => {})
+      .catch(() => {});
+  } catch {}
 }
 
 export async function GET(
@@ -24,6 +58,10 @@ export async function GET(
   if (!profile || !profile.bookingEnabled) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
+
+  // Track embed site (fire-and-forget, no latency impact)
+  const origin = req.headers.get("origin") || req.headers.get("referer");
+  after(() => trackEmbedSite(profile, origin));
 
   const tz = profile.bookingTimezone || "UTC";
   const duration = profile.bookingDuration ?? 30;

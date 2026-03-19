@@ -35,6 +35,7 @@ export const profiles = pgTable("profiles", {
   // Shared group calendar
   bookingGroupId: text("booking_group_id").notNull().default(""), // group ID for shared calendar (empty = solo)
   bookingStrategy: text("booking_strategy").notNull().default("least-busy"), // "round-robin" | "least-busy"
+  bookingEmbedSites: text("booking_embed_sites").notNull().default("[]"), // JSON array of { origin, lastSeen }
   socialLinksPosition: text("social_links_position").notNull().default("footer"), // "footer" | "bio"
   customDomain: text("custom_domain").notNull().default(""),
   tipJarEnabled: boolean("tip_jar_enabled").notNull().default(false),

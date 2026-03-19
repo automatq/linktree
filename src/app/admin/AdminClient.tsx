@@ -2083,6 +2083,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [bookingGroupId, setBookingGroupId] = useState(profile.bookingGroupId ?? "");
   const [bookingStrategy, setBookingStrategy] = useState(profile.bookingStrategy ?? "least-busy");
   const [availableGroups, setAvailableGroups] = useState<BookingGroup[]>([]);
+  const [embedSites, setEmbedSites] = useState<{ origin: string; lastSeen: string }[]>([]);
 
   useEffect(() => {
     setLoadingBookings(true);
@@ -2094,6 +2095,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
         setAvailableGroups(d.groups || []);
         if (d.bookingGroupId !== undefined) setBookingGroupId(d.bookingGroupId);
         if (d.bookingStrategy) setBookingStrategy(d.bookingStrategy);
+        if (d.embedSites) setEmbedSites(d.embedSites);
       })
       .finally(() => setLoadingBookings(false));
   }, []);
@@ -2441,6 +2443,46 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
                 <p className="text-xs text-black/40 dark:text-white/40">{formatBookingTime(b.startsAt)}</p>
               </div>
             ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Active embed locations */}
+      {enabled && embedSites.length > 0 && (
+        <Section title={`Live on ${embedSites.length} ${embedSites.length === 1 ? "site" : "sites"}`}>
+          <div className="flex flex-col gap-2">
+            {embedSites.map((site) => {
+              const timeAgo = (() => {
+                const ms = Date.now() - new Date(site.lastSeen).getTime();
+                const mins = Math.floor(ms / 60000);
+                if (mins < 60) return `${mins}m ago`;
+                const hours = Math.floor(mins / 60);
+                if (hours < 24) return `${hours}h ago`;
+                const days = Math.floor(hours / 24);
+                return `${days}d ago`;
+              })();
+              return (
+                <div key={site.origin} className="flex items-center justify-between rounded-lg border border-black/8 dark:border-white/8 px-3 py-2.5">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-2 w-2 rounded-full bg-emerald-400 shrink-0" />
+                    <a
+                      href={site.origin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs font-medium text-black dark:text-white truncate hover:underline underline-offset-2"
+                    >
+                      {site.origin.replace(/^https?:\/\//, "")}
+                    </a>
+                  </div>
+                  <span className="text-[10px] text-black/30 dark:text-white/30 shrink-0 ml-3">
+                    {timeAgo}
+                  </span>
+                </div>
+              );
+            })}
+            <p className="text-[11px] text-black/30 dark:text-white/30">
+              Sites that have loaded your booking calendar. Updated automatically.
+            </p>
           </div>
         </Section>
       )}

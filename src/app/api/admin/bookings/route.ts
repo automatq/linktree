@@ -54,12 +54,17 @@ export async function GET() {
     })
   );
 
+  // Parse embed sites
+  let embedSites: { origin: string; lastSeen: string }[] = [];
+  try { embedSites = JSON.parse(profile.bookingEmbedSites || "[]"); } catch {}
+
   return NextResponse.json({
     bookings: bookingsWithAssignment,
     availability: userAvailability,
     groups: groupsWithCounts,
     bookingGroupId: profile.bookingGroupId || "",
     bookingStrategy: profile.bookingStrategy || "least-busy",
+    embedSites,
   });
 }
 
