@@ -2107,8 +2107,30 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
     }
   };
 
-  const updateWindow = (dow: number, field: "startTime" | "endTime", val: string) => {
-    setWindows((prev) => prev.map((w) => w.dayOfWeek === dow ? { ...w, [field]: val } : w));
+  const updateWindow = (dow: number, index: number, field: "startTime" | "endTime", val: string) => {
+    let count = 0;
+    setWindows((prev) => prev.map((w) => {
+      if (w.dayOfWeek === dow) {
+        if (count === index) { count++; return { ...w, [field]: val }; }
+        count++;
+      }
+      return w;
+    }));
+  };
+
+  const addWindow = (dow: number) => {
+    setWindows((prev) => [...prev, { dayOfWeek: dow, startTime: "13:00", endTime: "17:00" }]);
+  };
+
+  const removeWindow = (dow: number, index: number) => {
+    let count = 0;
+    setWindows((prev) => prev.filter((w) => {
+      if (w.dayOfWeek === dow) {
+        if (count === index) { count++; return false; }
+        count++;
+      }
+      return true;
+    }));
   };
 
   const bookingAutoStatus = useAutosave(async () => {
@@ -2250,15 +2272,15 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       {/* Availability grid */}
       {enabled && (
         <Section title="Availability">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             {DAY_LABELS.map((label, dow) => {
-              const win = windows.find((w) => w.dayOfWeek === dow);
-              const active = !!win;
+              const dayWindows = windows.filter((w) => w.dayOfWeek === dow);
+              const active = dayWindows.length > 0;
               return (
-                <div key={dow} className="flex items-center gap-3">
+                <div key={dow} className="flex items-start gap-3">
                   <button
                     onClick={() => toggleDay(dow)}
-                    className={`w-10 text-xs font-medium rounded-md px-1 py-1 transition-colors ${
+                    className={`w-10 text-xs font-medium rounded-md px-1 py-1 mt-1 transition-colors shrink-0 ${
                       active
                         ? "bg-black dark:bg-white text-white dark:text-black"
                         : "border border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"
@@ -2266,24 +2288,42 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
                   >
                     {label}
                   </button>
-                  {active && win ? (
-                    <div className="flex items-center gap-2 flex-1">
-                      <input
-                        type="time"
-                        value={win.startTime}
-                        onChange={(e) => updateWindow(dow, "startTime", e.target.value)}
-                        className={inputClass}
-                      />
-                      <span className="text-xs text-black/30 dark:text-white/30">–</span>
-                      <input
-                        type="time"
-                        value={win.endTime}
-                        onChange={(e) => updateWindow(dow, "endTime", e.target.value)}
-                        className={inputClass}
-                      />
+                  {active ? (
+                    <div className="flex flex-col gap-1.5 flex-1">
+                      {dayWindows.map((win, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            type="time"
+                            value={win.startTime}
+                            onChange={(e) => updateWindow(dow, idx, "startTime", e.target.value)}
+                            className={inputClass}
+                          />
+                          <span className="text-xs text-black/30 dark:text-white/30">–</span>
+                          <input
+                            type="time"
+                            value={win.endTime}
+                            onChange={(e) => updateWindow(dow, idx, "endTime", e.target.value)}
+                            className={inputClass}
+                          />
+                          {dayWindows.length > 1 && (
+                            <button
+                              onClick={() => removeWindow(dow, idx)}
+                              className="text-black/20 dark:text-white/20 hover:text-red-400 transition-colors"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      <button
+                        onClick={() => addWindow(dow)}
+                        className="text-[10px] text-black/30 dark:text-white/30 hover:text-black dark:hover:text-white transition-colors self-start"
+                      >
+                        + Add time window
+                      </button>
                     </div>
                   ) : (
-                    <span className="text-xs text-black/20 dark:text-white/20">Unavailable</span>
+                    <span className="text-xs text-black/20 dark:text-white/20 mt-1.5">Unavailable</span>
                   )}
                 </div>
               );
