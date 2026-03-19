@@ -109,32 +109,75 @@ export async function sendHostNotification(data: BookingEmailData) {
   }).catch((err) => console.error("Email send failed:", err));
 }
 
-export async function sendGuestReminder(data: BookingEmailData, scheduledAt: Date) {
-  if (!process.env.RESEND_API_KEY) return;
+export async function sendGuestReminder(data: BookingEmailData, scheduledAt: Date): Promise<string | null> {
+  if (!process.env.RESEND_API_KEY) return null;
 
   const dateStr = formatDateTime(data.startsAt, data.guestTimezone);
 
-  await resend.emails.send({
-    from: "Bookings <bookings@resend.dev>",
-    to: data.guestEmail,
-    subject: `Reminder: ${data.title} with ${data.hostName} is coming up`,
-    scheduledAt: scheduledAt.toISOString(),
-    html: `
-      <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#111">
-        <h2 style="margin:0 0 8px">Your call is coming up 🔔</h2>
-        <p style="color:#555;margin:0 0 24px">Just a reminder about your upcoming call.</p>
+  try {
+    const result = await resend.emails.send({
+      from: "Bookings <bookings@resend.dev>",
+      to: data.guestEmail,
+      subject: `Reminder: ${data.title} with ${data.hostName} is coming up`,
+      scheduledAt: scheduledAt.toISOString(),
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#111">
+          <h2 style="margin:0 0 8px">Your call is coming up 🔔</h2>
+          <p style="color:#555;margin:0 0 24px">Just a reminder about your upcoming call.</p>
 
-        <div style="background:#f9f9f9;border-radius:8px;padding:20px">
-          <div style="margin-bottom:12px">
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">What</div>
-            <div style="font-weight:600">${data.title}</div>
-          </div>
-          <div>
-            <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">When</div>
-            <div style="font-weight:600">${dateStr}</div>
+          <div style="background:#f9f9f9;border-radius:8px;padding:20px">
+            <div style="margin-bottom:12px">
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">What</div>
+              <div style="font-weight:600">${data.title}</div>
+            </div>
+            <div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">When</div>
+              <div style="font-weight:600">${dateStr}</div>
+            </div>
           </div>
         </div>
-      </div>
-    `,
-  } as Parameters<typeof resend.emails.send>[0]).catch((err) => console.error("Email send failed:", err));
+      `,
+    } as Parameters<typeof resend.emails.send>[0]);
+    return (result as any)?.data?.id ?? null;
+  } catch (err) {
+    console.error("Email send failed:", err);
+    return null;
+  }
+}
+
+export async function sendHostReminder(data: BookingEmailData, scheduledAt: Date): Promise<string | null> {
+  if (!process.env.RESEND_API_KEY || !data.hostEmail) return null;
+
+  const dateStr = formatDateTime(data.startsAt, data.hostTimezone);
+
+  try {
+    const result = await resend.emails.send({
+      from: "Bookings <bookings@resend.dev>",
+      to: data.hostEmail,
+      subject: `Reminder: ${data.guestName} — call coming up`,
+      scheduledAt: scheduledAt.toISOString(),
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#111">
+          <h2 style="margin:0 0 8px">Call reminder 🔔</h2>
+          <p style="color:#555;margin:0 0 24px">You have an upcoming call with ${data.guestName}.</p>
+
+          <div style="background:#f9f9f9;border-radius:8px;padding:20px">
+            <div style="margin-bottom:12px">
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">Guest</div>
+              <div style="font-weight:600">${data.guestName}</div>
+              <div style="color:#555;font-size:14px">${data.guestEmail}</div>
+            </div>
+            <div>
+              <div style="font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#888;margin-bottom:2px">When</div>
+              <div style="font-weight:600">${dateStr}</div>
+            </div>
+          </div>
+        </div>
+      `,
+    } as Parameters<typeof resend.emails.send>[0]);
+    return (result as any)?.data?.id ?? null;
+  } catch (err) {
+    console.error("Email send failed:", err);
+    return null;
+  }
 }

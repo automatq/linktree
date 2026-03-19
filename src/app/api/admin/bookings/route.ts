@@ -78,6 +78,7 @@ export async function GET() {
       email: profile.bookingEmail,
       timezone: profile.bookingTimezone,
       smsNumber: profile.bookingSmsNumber,
+      reminderRules: (() => { try { return JSON.parse(profile.bookingReminderRules || "[]"); } catch { return []; } })(),
     },
   });
 }
@@ -106,6 +107,7 @@ export async function POST(req: Request) {
       bookingSmsNumber: config.smsNumber || "",
       bookingGroupId: config.bookingGroupId ?? "",
       bookingStrategy: config.bookingStrategy || "least-busy",
+      bookingReminderRules: JSON.stringify(config.reminderRules ?? []),
     })
     .where(eq(profiles.userId, userId));
 

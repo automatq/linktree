@@ -36,6 +36,7 @@ export const profiles = pgTable("profiles", {
   bookingGroupId: text("booking_group_id").notNull().default(""), // group ID for shared calendar (empty = solo)
   bookingStrategy: text("booking_strategy").notNull().default("least-busy"), // "round-robin" | "least-busy"
   bookingEmbedSites: text("booking_embed_sites").notNull().default("[]"), // JSON array of { origin, lastSeen }
+  bookingReminderRules: text("booking_reminder_rules").notNull().default("[]"), // JSON array of { minutesBefore, channels, parties }
   socialLinksPosition: text("social_links_position").notNull().default("footer"), // "footer" | "bio"
   customDomain: text("custom_domain").notNull().default(""),
   tipJarEnabled: boolean("tip_jar_enabled").notNull().default(false),
@@ -384,6 +385,23 @@ export const eventRsvps = pgTable("event_rsvps", {
 }, (t) => [
   index("event_rsvps_event_id_idx").on(t.eventId),
   index("event_rsvps_attendee_idx").on(t.eventId, t.attendeeProfileId),
+]);
+
+// Pending reminders — individual reminder instances queued for delivery
+export const pendingReminders = pgTable("pending_reminders", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull().references(() => bookings.id, { onDelete: "cascade" }),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  channel: text("channel").notNull(), // "email" | "sms"
+  party: text("party").notNull(),     // "host" | "guest"
+  minutesBefore: integer("minutes_before").notNull(),
+  sendAt: timestamp("send_at").notNull(),
+  sent: boolean("sent").notNull().default(false),
+  resendEmailId: text("resend_email_id"), // for cancelling scheduled Resend emails
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("pending_reminders_send_at_idx").on(t.sent, t.sendAt),
+  index("pending_reminders_booking_id_idx").on(t.bookingId),
 ]);
 
 // Blocked dates — specific days a profile owner marks as unavailable

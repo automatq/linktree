@@ -1,11 +1,12 @@
 import { NextResponse, after } from "next/server";
 import { db } from "@/db";
-import { profiles, availability, bookings, groups, groupMembers, blockedDates } from "@/db/schema";
+import { profiles, availability, bookings, groups, groupMembers, blockedDates, pendingReminders } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { generateSlots, generateGroupSlots, pickGroupMember } from "@/lib/slots";
 import type { GroupMemberSlotInfo } from "@/lib/slots";
-import { sendGuestConfirmation, sendHostNotification, sendGuestReminder } from "@/lib/email";
-import { sendGuestConfirmationSms, sendHostNotificationSms } from "@/lib/sms";
+import { sendGuestConfirmation, sendHostNotification, sendGuestReminder, sendHostReminder } from "@/lib/email";
+import type { BookingEmailData } from "@/lib/email";
+import { sendGuestConfirmationSms, sendHostNotificationSms, sendGuestReminderSms, sendHostReminderSms } from "@/lib/sms";
 import { fireWebhook } from "@/lib/webhook";
 import { isRateLimited } from "@/lib/rate-limit";
 
@@ -240,18 +241,65 @@ export async function POST(
     hostTimezone: hostTz,
   };
 
+  // Send instant confirmations
   await Promise.all([
     sendGuestConfirmation(emailData),
     sendHostNotification(emailData),
     sendGuestConfirmationSms(smsData),
     sendHostNotificationSms(smsData),
-    startsAt.getTime() - Date.now() > 25 * 3600 * 1000
-      ? sendGuestReminder(emailData, new Date(startsAt.getTime() - 24 * 3600 * 1000))
-      : Promise.resolve(),
-    startsAt.getTime() - Date.now() > 70 * 60 * 1000
-      ? sendGuestReminder(emailData, new Date(startsAt.getTime() - 60 * 60 * 1000))
-      : Promise.resolve(),
   ]);
+
+  // Schedule configurable reminders
+  type ReminderRule = { minutesBefore: number; channels: string[]; parties: string[] };
+  const rules: ReminderRule[] = (() => {
+    try { return JSON.parse(profile.bookingReminderRules || "[]"); } catch { return []; }
+  })();
+
+  // Fallback: if no rules configured, use default 24h + 1h guest email reminders
+  const effectiveRules = rules.length > 0 ? rules : [
+    { minutesBefore: 1440, channels: ["email"], parties: ["guest"] },
+    { minutesBefore: 60, channels: ["email"], parties: ["guest"] },
+  ];
+
+  for (const rule of effectiveRules) {
+    const sendAt = new Date(startsAt.getTime() - rule.minutesBefore * 60 * 1000);
+    if (sendAt.getTime() <= Date.now()) continue; // skip if already past
+
+    for (const channel of rule.channels) {
+      for (const party of rule.parties) {
+        const reminderId = crypto.randomUUID();
+
+        if (channel === "email") {
+          // Resend supports scheduling up to 72h in advance
+          const hoursUntilSend = (sendAt.getTime() - Date.now()) / 3600000;
+          if (hoursUntilSend <= 72) {
+            // Schedule via Resend now
+            const emailFn = party === "guest" ? sendGuestReminder : sendHostReminder;
+            const resendId = await emailFn(emailData, sendAt);
+            await db.insert(pendingReminders).values({
+              id: reminderId, bookingId: id, profileId: profile.id,
+              channel, party, minutesBefore: rule.minutesBefore,
+              sendAt, sent: true, resendEmailId: resendId || undefined,
+            });
+          } else {
+            // Too far out for Resend — cron will schedule it later
+            await db.insert(pendingReminders).values({
+              id: reminderId, bookingId: id, profileId: profile.id,
+              channel, party, minutesBefore: rule.minutesBefore,
+              sendAt, sent: false,
+            });
+          }
+        } else if (channel === "sms") {
+          // SMS: cron job will send when sendAt arrives
+          await db.insert(pendingReminders).values({
+            id: reminderId, bookingId: id, profileId: profile.id,
+            channel, party, minutesBefore: rule.minutesBefore,
+            sendAt, sent: false,
+          });
+        }
+      }
+    }
+  }
 
   const webhookUrl = profile.webhookUrl;
   if (webhookUrl) {

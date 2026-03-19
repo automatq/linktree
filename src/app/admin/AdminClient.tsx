@@ -2087,6 +2087,8 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
   const [blockedDatesSet, setBlockedDatesSet] = useState<Set<string>>(new Set());
   const [calMonth, setCalMonth] = useState(() => ({ year: new Date().getFullYear(), month: new Date().getMonth() }));
   const [configLoaded, setConfigLoaded] = useState(false);
+  type ReminderRule = { minutesBefore: number; channels: string[]; parties: string[] };
+  const [reminderRules, setReminderRules] = useState<ReminderRule[]>([]);
 
   useEffect(() => {
     setLoadingBookings(true);
@@ -2110,6 +2112,7 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
           setEmail(d.config.email ?? "");
           setTimezone(d.config.timezone ?? "UTC");
           setSmsNumber(d.config.smsNumber ?? "");
+          if (d.config.reminderRules) setReminderRules(d.config.reminderRules);
         }
         setConfigLoaded(true);
       })
@@ -2157,11 +2160,11 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        config: { enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, bookingGroupId, bookingStrategy },
+        config: { enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, bookingGroupId, bookingStrategy, reminderRules },
         windows,
       }),
     });
-  }, [configLoaded, enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows, bookingGroupId, bookingStrategy]);
+  }, [configLoaded, enabled, title, duration, buffer, advanceDays, email, timezone, smsNumber, windows, bookingGroupId, bookingStrategy, reminderRules]);
 
   const cancelBooking = async (id: string) => {
     await fetch(`/api/admin/bookings/${id}`, {
@@ -2185,6 +2188,46 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ date: dateStr, blocked: !isCurrentlyBlocked }),
     });
+  };
+
+  const REMINDER_INTERVALS = [
+    { value: 2880, label: "48 hours before" },
+    { value: 1440, label: "24 hours before" },
+    { value: 120,  label: "2 hours before" },
+    { value: 60,   label: "1 hour before" },
+    { value: 30,   label: "30 minutes before" },
+  ];
+
+  const addReminderRule = () => {
+    setReminderRules((prev) => [...prev, { minutesBefore: 1440, channels: ["email", "sms"], parties: ["host", "guest"] }]);
+  };
+
+  const removeReminderRule = (index: number) => {
+    setReminderRules((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const updateReminderRule = (index: number, field: string, value: unknown) => {
+    setReminderRules((prev) => prev.map((r, i) => i === index ? { ...r, [field]: value } : r));
+  };
+
+  const toggleReminderChannel = (index: number, channel: string) => {
+    setReminderRules((prev) => prev.map((r, i) => {
+      if (i !== index) return r;
+      const channels = r.channels.includes(channel)
+        ? r.channels.filter((c) => c !== channel)
+        : [...r.channels, channel];
+      return { ...r, channels };
+    }));
+  };
+
+  const toggleReminderParty = (index: number, party: string) => {
+    setReminderRules((prev) => prev.map((r, i) => {
+      if (i !== index) return r;
+      const parties = r.parties.includes(party)
+        ? r.parties.filter((p) => p !== party)
+        : [...r.parties, party];
+      return { ...r, parties };
+    }));
   };
 
   const CAL_MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -2305,6 +2348,96 @@ function BookingTab({ profile, username }: { profile: import("@/data/links").Pro
           )}
         </div>
       </Section>
+
+      {/* Reminders */}
+      {enabled && (
+        <Section title="Reminders">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-black/40 dark:text-white/40">
+              Configure when and how reminders are sent before each booking.
+            </p>
+
+            {reminderRules.length === 0 && (
+              <p className="text-xs text-black/30 dark:text-white/30 py-2">
+                No custom reminders configured. Default: guest receives email reminders at 24h and 1h before.
+              </p>
+            )}
+
+            {reminderRules.map((rule, idx) => (
+              <div key={idx} className="rounded-lg border border-black/8 dark:border-white/8 p-3 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <select
+                    className={selectClass}
+                    value={rule.minutesBefore}
+                    onChange={(e) => updateReminderRule(idx, "minutesBefore", Number(e.target.value))}
+                  >
+                    {REMINDER_INTERVALS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={() => removeReminderRule(idx)}
+                    className="text-black/20 dark:text-white/20 hover:text-red-400 transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30 w-12">Send via</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rule.channels.includes("email")}
+                      onChange={() => toggleReminderChannel(idx, "email")}
+                      className="rounded border-black/20 dark:border-white/20"
+                    />
+                    <span className="text-xs text-black/70 dark:text-white/70">Email</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rule.channels.includes("sms")}
+                      onChange={() => toggleReminderChannel(idx, "sms")}
+                      className="rounded border-black/20 dark:border-white/20"
+                    />
+                    <span className="text-xs text-black/70 dark:text-white/70">SMS</span>
+                  </label>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <span className="text-[10px] uppercase tracking-wider text-black/30 dark:text-white/30 w-12">Send to</span>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rule.parties.includes("host")}
+                      onChange={() => toggleReminderParty(idx, "host")}
+                      className="rounded border-black/20 dark:border-white/20"
+                    />
+                    <span className="text-xs text-black/70 dark:text-white/70">Host</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rule.parties.includes("guest")}
+                      onChange={() => toggleReminderParty(idx, "guest")}
+                      className="rounded border-black/20 dark:border-white/20"
+                    />
+                    <span className="text-xs text-black/70 dark:text-white/70">Guest</span>
+                  </label>
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={addReminderRule}
+              className="text-xs text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors self-start"
+            >
+              + Add reminder
+            </button>
+          </div>
+        </Section>
+      )}
 
       {/* Availability grid */}
       {enabled && (
