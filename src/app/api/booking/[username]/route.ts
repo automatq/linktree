@@ -12,6 +12,10 @@ function genId() {
   return crypto.randomUUID();
 }
 
+export async function OPTIONS() {
+  return new Response(null, { status: 204 });
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ username: string }> }

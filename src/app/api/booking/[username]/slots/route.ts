@@ -4,6 +4,10 @@ import { profiles, availability, bookings } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { generateSlots, utcToLocalDate, getDayOfWeek } from "@/lib/slots";
 
+export async function OPTIONS() {
+  return new Response(null, { status: 204 });
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ username: string }> }
