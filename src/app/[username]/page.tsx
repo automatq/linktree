@@ -4,7 +4,7 @@ import { after } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/db";
 import { profiles, links, socialLinks, profileViews, products, galleryImages, previousUsernames, groups, groupMembers } from "@/db/schema";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc, and, sql } from "drizzle-orm";
 import { Avatar } from "@/components/Avatar";
 import { LinkCard, type CardStyle, type CardSize } from "@/components/LinkCard";
 import { SocialLinks } from "@/components/SocialLinks";
@@ -118,11 +118,22 @@ export default async function ProfilePage({
     db.select().from(socialLinks).where(eq(socialLinks.profileId, profile.id)).orderBy(asc(socialLinks.position)),
     db.select().from(products).where(eq(products.profileId, profile.id)).orderBy(asc(products.position)),
     db.select().from(galleryImages).where(eq(galleryImages.profileId, profile.id)).orderBy(asc(galleryImages.position)),
-    // Fetch groups with members
+    // Fetch groups: groups this user created + groups they're an accepted member of
     (async () => {
       if (!profile.groupsEnabled) return [];
-      const userGroups = await db.select().from(groups).where(eq(groups.profileId, profile.id)).orderBy(asc(groups.position));
-      return Promise.all(userGroups.map(async (g) => {
+      // Groups this user owns
+      const ownedGroups = await db.select().from(groups).where(eq(groups.profileId, profile.id)).orderBy(asc(groups.position));
+      // Groups this user is an accepted member of (created by others)
+      const memberRows = await db
+        .select({ groupId: groupMembers.groupId })
+        .from(groupMembers)
+        .where(and(eq(groupMembers.memberProfileId, profile.id), eq(groupMembers.status, "accepted")));
+      const memberGroupIds = memberRows.map((r) => r.groupId).filter((id) => !ownedGroups.some((g) => g.id === id));
+      const memberGroups = memberGroupIds.length > 0
+        ? await db.select().from(groups).where(sql`${groups.id} = ANY(${memberGroupIds})`)
+        : [];
+      const allGroups = [...ownedGroups, ...memberGroups];
+      return Promise.all(allGroups.map(async (g) => {
         const members = await db
           .select({
             id: groupMembers.id,
