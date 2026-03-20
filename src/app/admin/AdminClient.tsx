@@ -71,6 +71,8 @@ export function AdminClient() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store" | "groups">("content");
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showQR, setShowQR] = useState(false);
   const [metaPixelId, setMetaPixelId] = useState("");
   const [tiktokPixelId, setTiktokPixelId] = useState("");
@@ -1908,6 +1910,55 @@ export function AdminClient() {
                     Visit {customDomain}
                   </a>
                 )}
+              </div>
+            </Section>
+
+            {/* Danger Zone */}
+            <Section title="Danger zone">
+              <div className="flex flex-col gap-3 p-4 rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-900/10">
+                <div>
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400">Delete account</p>
+                  <p className="text-xs text-red-500/70 dark:text-red-400/60 mt-1">
+                    Permanently delete your account and all associated data including links, products, bookings, subscribers, reviews, voice notes, wall notes, events, and groups. This action cannot be undone.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[10px] text-red-500/60 dark:text-red-400/50 uppercase tracking-wider font-medium">
+                    Type DELETE MY ACCOUNT to confirm
+                  </label>
+                  <input
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    placeholder="DELETE MY ACCOUNT"
+                    className="h-8 w-full rounded-md border border-red-200 dark:border-red-900/50 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-red-400 dark:focus:border-red-600 transition-colors"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (deleteConfirmText !== "DELETE MY ACCOUNT") return;
+                      if (!confirm("This is your final warning. Your entire account will be permanently deleted. Continue?")) return;
+                      setDeletingAccount(true);
+                      try {
+                        const res = await fetch("/api/admin/account", {
+                          method: "DELETE",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ confirm: "DELETE MY ACCOUNT" }),
+                        });
+                        if (res.ok) {
+                          window.location.href = "/";
+                        } else {
+                          const d = await res.json();
+                          alert(d.error || "Something went wrong");
+                        }
+                      } finally {
+                        setDeletingAccount(false);
+                      }
+                    }}
+                    disabled={deletingAccount || deleteConfirmText !== "DELETE MY ACCOUNT"}
+                    className="h-8 w-full rounded-md bg-red-600 text-white text-xs font-medium transition-opacity hover:bg-red-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                  >
+                    {deletingAccount ? "Deleting…" : "Permanently delete my account"}
+                  </button>
+                </div>
               </div>
             </Section>
           </>

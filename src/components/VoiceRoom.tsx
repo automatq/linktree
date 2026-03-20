@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { ReactionBar, useReactions } from "@/components/ReactionBar";
 
 type VoiceNote = {
   id: string;
@@ -333,6 +334,9 @@ export function VoiceRooms({
       .then((d) => { setRooms(d.rooms || []); setLoaded(true); });
   }, [username]);
 
+  const allNoteIds = useMemo(() => rooms.flatMap((r) => r.notes.map((n) => n.id)), [rooms]);
+  const reactionData = useReactions(username, "voice_note", allNoteIds);
+
   if (!loaded || rooms.length === 0) return null;
 
   return (
@@ -405,7 +409,18 @@ export function VoiceRooms({
           {room.notes.length > 0 && (
             <div className="flex flex-col gap-2">
               {room.notes.map((note) => (
-                <AudioPlayer key={note.id} note={note} accentColor={accentColor} />
+                <div key={note.id} className="flex flex-col gap-1">
+                  <AudioPlayer note={note} accentColor={accentColor} />
+                  <div className="pl-12">
+                    <ReactionBar
+                      username={username}
+                      targetType="voice_note"
+                      targetId={note.id}
+                      initialData={reactionData[note.id]}
+                      accentColor={accentColor}
+                    />
+                  </div>
+                </div>
               ))}
             </div>
           )}

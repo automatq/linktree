@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { ReactionBar, useReactions } from "@/components/ReactionBar";
 
 type Review = {
   id: string;
@@ -429,6 +430,8 @@ export function ReviewSection({
       });
   }, [username]);
 
+  const reactionData = useReactions(username, "review", reviewsList.map((r) => r.id));
+
   if (!loaded) return null;
 
   return (
@@ -494,7 +497,18 @@ export function ReviewSection({
       ) : (
         <div className="flex flex-col gap-3">
           {reviewsList.map((review) => (
-            <ReviewCard key={review.id} review={review} accentColor={accentColor} />
+            <div key={review.id} className="flex flex-col gap-1">
+              <ReviewCard review={review} accentColor={accentColor} />
+              <div className="pl-2">
+                <ReactionBar
+                  username={username}
+                  targetType="review"
+                  targetId={review.id}
+                  initialData={reactionData[review.id]}
+                  accentColor={accentColor}
+                />
+              </div>
+            </div>
           ))}
         </div>
       )}

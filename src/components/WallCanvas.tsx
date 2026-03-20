@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import Link from "next/link";
+import { ReactionBar, useReactions } from "@/components/ReactionBar";
 
 type WallNote = {
   id: string;
@@ -62,6 +63,8 @@ export function WallCanvas({
       .then((r) => r.json())
       .then((d) => setNotes(d.notes || []));
   }, [username]);
+
+  const reactionData = useReactions(username, "wall_note", notes.map((n) => n.id));
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -220,6 +223,13 @@ export function WallCanvas({
                     {timeAgo(note.createdAt)}
                   </span>
                 </div>
+                <ReactionBar
+                  username={username}
+                  targetType="wall_note"
+                  targetId={note.id}
+                  initialData={reactionData[note.id]}
+                  accentColor={accentColor}
+                />
               </div>
             );
           })}

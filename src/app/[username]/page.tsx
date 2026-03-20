@@ -25,6 +25,8 @@ import { GroupShowcase } from "@/components/GroupShowcase";
 import { WallCanvas } from "@/components/WallCanvas";
 import { ReviewSection } from "@/components/ReviewSection";
 import { VoiceRooms } from "@/components/VoiceRoom";
+import { PollSection } from "@/components/PollCard";
+import { EventSection } from "@/components/EventCard";
 import { parseDevice, parseReferrer } from "@/lib/tracking";
 import { fetchLatestRssItem } from "@/lib/rss";
 
@@ -367,6 +369,20 @@ export default async function ProfilePage({
         {profile.voiceRoomsEnabled && (
           <section className="w-full mt-4 flex flex-col gap-4">
             <VoiceRooms username={profile.username} accentColor={accentColor} />
+          </section>
+        )}
+
+        {/* Events */}
+        {profile.eventsEnabled && (
+          <section className="w-full mt-4">
+            <EventSection username={profile.username} accentColor={accentColor} />
+          </section>
+        )}
+
+        {/* Polls */}
+        {profile.pollsEnabled && (
+          <section className="w-full mt-4">
+            <PollSection username={profile.username} accentColor={accentColor} />
           </section>
         )}
 
