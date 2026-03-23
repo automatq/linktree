@@ -70,6 +70,7 @@ export async function GET(req: Request) {
     } else if (reminder.channel === "email") {
       // Email reminders that were too far out to schedule via Resend at booking time
       const emailData = {
+        username: p.username,
         guestName: b.guestName,
         guestEmail: b.guestEmail,
         hostName: hostProfile.name || "",

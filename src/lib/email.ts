@@ -124,7 +124,7 @@ export async function sendCampaignBatch(
         email: r.email,
       });
       return {
-        from: "Newsletter <bookings@resend.dev>",
+        from: fromAddress(username),
         to: r.email,
         subject: subj,
         html,
@@ -184,6 +184,7 @@ export async function sendCampaignBatch(
 }
 
 export type BookingEmailData = {
+  username: string; // host's username for from address
   guestName: string;
   guestEmail: string;
   hostName: string;
@@ -196,6 +197,10 @@ export type BookingEmailData = {
   notes?: string;
   cancelUrl?: string;
 };
+
+function fromAddress(username: string): string {
+  return `${username}@axiomflow.ca`;
+}
 
 function formatDateTime(date: Date, tz: string): string {
   return date.toLocaleString("en-US", {
@@ -226,7 +231,7 @@ export async function sendGuestConfirmation(data: BookingEmailData) {
   const endTimeStr = formatTime(data.endsAt, data.guestTimezone);
 
   await resend.emails.send({
-    from: "Bookings <bookings@resend.dev>",
+    from: fromAddress(data.username),
     to: data.guestEmail,
     subject: `Confirmed: ${data.title} with ${data.hostName}`,
     html: `
@@ -264,7 +269,7 @@ export async function sendHostNotification(data: BookingEmailData) {
   const endTimeStr = formatTime(data.endsAt, data.hostTimezone);
 
   await resend.emails.send({
-    from: "Bookings <bookings@resend.dev>",
+    from: fromAddress(data.username),
     to: data.hostEmail,
     subject: `New booking: ${data.guestName} — ${formatDateTime(data.startsAt, data.hostTimezone)}`,
     html: `
@@ -297,7 +302,7 @@ export async function sendGuestReminder(data: BookingEmailData, scheduledAt: Dat
 
   try {
     const result = await resend.emails.send({
-      from: "Bookings <bookings@resend.dev>",
+      from: fromAddress(data.username),
       to: data.guestEmail,
       subject: `Reminder: ${data.title} with ${data.hostName} is coming up`,
       scheduledAt: scheduledAt.toISOString(),
@@ -333,7 +338,7 @@ export async function sendHostReminder(data: BookingEmailData, scheduledAt: Date
 
   try {
     const result = await resend.emails.send({
-      from: "Bookings <bookings@resend.dev>",
+      from: fromAddress(data.username),
       to: data.hostEmail,
       subject: `Reminder: ${data.guestName} — call coming up`,
       scheduledAt: scheduledAt.toISOString(),

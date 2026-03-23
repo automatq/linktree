@@ -219,6 +219,7 @@ export async function POST(
   const hostSmsNumber = assignedProfile?.bookingSmsNumber || profile.bookingSmsNumber || "";
 
   const emailData = {
+    username: profile.username,
     guestName,
     guestEmail,
     hostName,
@@ -356,7 +357,7 @@ export async function POST(
         try {
           const useScheduled = auto.triggerDelayMinutes <= 72 * 60 && auto.triggerDelayMinutes > 0;
           const result = await resendClient.emails.send({
-            from: "Newsletter <bookings@resend.dev>",
+            from: `${profile.username}@axiomflow.ca`,
             to: guestEmail,
             subject: subj,
             html,

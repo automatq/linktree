@@ -61,7 +61,7 @@ export async function POST(
   if (profile.contactFormEmail && process.env.RESEND_API_KEY) {
     promises.push(
       resend.emails.send({
-        from: "Contact Form <bookings@resend.dev>",
+        from: `${username}@axiomflow.ca`,
         to: profile.contactFormEmail,
         replyTo: trimmedEmail,
         subject: `New message from ${trimmedName} via TriLink`,

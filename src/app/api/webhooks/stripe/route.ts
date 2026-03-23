@@ -87,7 +87,7 @@ export async function POST(req: Request) {
                 try {
                   const useScheduled = auto.triggerDelayMinutes <= 72 * 60 && auto.triggerDelayMinutes > 0;
                   const result = await resendAuto.emails.send({
-                    from: "Newsletter <bookings@resend.dev>",
+                    from: `${profile.username}@axiomflow.ca`,
                     to: guestEmail,
                     subject: subj,
                     html,
@@ -101,10 +101,10 @@ export async function POST(req: Request) {
         } catch (err) { console.error("Post-purchase automation error:", err); }
       }
 
-      if (product?.fileUrl && session.customer_details?.email && process.env.RESEND_API_KEY) {
+      if (product?.fileUrl && session.customer_details?.email && process.env.RESEND_API_KEY && profile) {
         const resend = new Resend(process.env.RESEND_API_KEY);
         await resend.emails.send({
-          from: "TriLink Store <bookings@resend.dev>",
+          from: `${profile.username}@axiomflow.ca`,
           to: session.customer_details.email,
           subject: `Your download: ${product.title}`,
           html: `
