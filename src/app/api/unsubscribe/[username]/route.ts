@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { profiles, subscribers } from "@/db/schema";
+import { profiles, subscribers, unsubscribes } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
 /** Public unsubscribe endpoint — linked from emails */
@@ -30,11 +30,18 @@ export async function GET(
     });
   }
 
+  // Remove from subscribers list
   await db
     .delete(subscribers)
     .where(
       and(eq(subscribers.profileId, profile.id), eq(subscribers.email, email))
     );
+
+  // Also add to unsubscribes table (covers booking/order contacts)
+  await db
+    .insert(unsubscribes)
+    .values({ id: crypto.randomUUID(), profileId: profile.id, email })
+    .onConflictDoNothing();
 
   return new Response(
     unsubPage("You have been unsubscribed. You will no longer receive emails."),

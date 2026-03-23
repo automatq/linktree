@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, boolean, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 
 export const profiles = pgTable("profiles", {
@@ -436,4 +436,63 @@ export const bookings = pgTable("bookings", {
 }, (t) => [
   index("bookings_profile_id_idx").on(t.profileId),
   index("bookings_profile_status_idx").on(t.profileId, t.status),
+]);
+
+// Email templates — user-created reusable templates for campaigns
+export const emailTemplates = pgTable("email_templates", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  subject: text("subject").notNull(),
+  bodyHtml: text("body_html").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (t) => [
+  index("email_templates_profile_id_idx").on(t.profileId),
+]);
+
+// Campaigns — broadcast or automation email sends
+export const campaigns = pgTable("campaigns", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  templateId: text("template_id").references(() => emailTemplates.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  type: text("type").notNull().default("broadcast"), // "broadcast" | "automation"
+  audienceFilter: text("audience_filter").notNull().default('{"source":"all"}'), // JSON
+  status: text("status").notNull().default("draft"), // "draft" | "sending" | "sent" | "active" | "paused"
+  triggerType: text("trigger_type").notNull().default(""), // "" | "post_booking" | "post_purchase"
+  triggerDelayMinutes: integer("trigger_delay_minutes").notNull().default(0),
+  totalRecipients: integer("total_recipients").notNull().default(0),
+  totalSent: integer("total_sent").notNull().default(0),
+  scheduledAt: timestamp("scheduled_at"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("campaigns_profile_status_idx").on(t.profileId, t.status),
+]);
+
+// Campaign sends — per-recipient send log
+export const campaignSends = pgTable("campaign_sends", {
+  id: text("id").primaryKey(),
+  campaignId: text("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  recipientEmail: text("recipient_email").notNull(),
+  recipientName: text("recipient_name").notNull().default(""),
+  status: text("status").notNull().default("queued"), // "queued" | "sent" | "failed"
+  resendEmailId: text("resend_email_id"),
+  sentAt: timestamp("sent_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  index("campaign_sends_campaign_status_idx").on(t.campaignId, t.status),
+  index("campaign_sends_profile_email_idx").on(t.profileId, t.recipientEmail),
+]);
+
+// Unsubscribes — opt-out list for campaign emails (covers non-subscriber contacts)
+export const unsubscribes = pgTable("unsubscribes", {
+  id: text("id").primaryKey(),
+  profileId: integer("profile_id").notNull().references(() => profiles.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (t) => [
+  uniqueIndex("unsubscribes_profile_email_idx").on(t.profileId, t.email),
 ]);

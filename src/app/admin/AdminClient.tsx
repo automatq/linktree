@@ -70,7 +70,7 @@ export function AdminClient() {
   const [domainStatusMsg, setDomainStatusMsg] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loadError, setLoadError] = useState(false);
-  const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store" | "groups">("content");
+  const [tab, setTab] = useState<"content" | "analytics" | "booking" | "store" | "groups" | "email">("content");
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [showQR, setShowQR] = useState(false);
@@ -506,7 +506,7 @@ export function AdminClient() {
           </div>
           {/* Bottom row: tab nav */}
           <nav className="flex gap-1 pb-2 -mx-1 overflow-x-auto scrollbar-none">
-            {(["content", "analytics", "booking", "store", "groups"] as const).map((t) => (
+            {(["content", "analytics", "booking", "store", "groups", "email"] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
@@ -2066,6 +2066,10 @@ export function AdminClient() {
 
         {tab === "groups" && data.profile && (
           <GroupsTab profile={data.profile} />
+        )}
+
+        {tab === "email" && username && (
+          <EmailTab username={username} />
         )}
 
       </main>
@@ -5421,6 +5425,541 @@ function QRModal({ username, onClose }: { username: string; onClose: () => void 
           Download PNG
         </button>
       </div>
+    </div>
+  );
+}
+
+// ── Email Tab ───────────────────────────────────────────────────────────────
+
+type EmailTemplate = { id: string; name: string; subject: string; bodyHtml: string; createdAt: string; updatedAt: string };
+type Campaign = { id: string; templateId: string | null; name: string; type: string; audienceFilter: string; status: string; triggerType: string; triggerDelayMinutes: number; totalRecipients: number; totalSent: number; scheduledAt: string | null; sentAt: string | null; createdAt: string; templateName: string | null };
+
+function EmailTab({ username }: { username: string }) {
+  const [view, setView] = useState<"templates" | "broadcasts" | "automations">("templates");
+  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const [campaignsList, setCampaignsList] = useState<Campaign[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // Template form
+  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
+  const [tplName, setTplName] = useState("");
+  const [tplSubject, setTplSubject] = useState("");
+  const [tplBody, setTplBody] = useState("");
+  const [savingTpl, setSavingTpl] = useState(false);
+  const [showNewTemplate, setShowNewTemplate] = useState(false);
+
+  // Campaign form
+  const [showNewCampaign, setShowNewCampaign] = useState(false);
+  const [campName, setCampName] = useState("");
+  const [campTemplateId, setCampTemplateId] = useState("");
+  const [campAudienceSource, setCampAudienceSource] = useState<"all" | "subscribers" | "bookings" | "orders">("all");
+  const [campWithinDays, setCampWithinDays] = useState("");
+  const [audienceCount, setAudienceCount] = useState<number | null>(null);
+  const [creatingCamp, setCreatingCamp] = useState(false);
+  const [sendingId, setSendingId] = useState<string | null>(null);
+
+  // Automation form
+  const [showNewAutomation, setShowNewAutomation] = useState(false);
+  const [autoName, setAutoName] = useState("");
+  const [autoTemplateId, setAutoTemplateId] = useState("");
+  const [autoTrigger, setAutoTrigger] = useState<"post_booking" | "post_purchase">("post_booking");
+  const [autoDelay, setAutoDelay] = useState("60"); // minutes
+  const [creatingAuto, setCreatingAuto] = useState(false);
+
+  // Preview
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/admin/email-templates").then((r) => r.json()),
+      fetch("/api/admin/campaigns").then((r) => r.json()),
+    ]).then(([t, c]) => {
+      setTemplates(t.templates || []);
+      setCampaignsList(c.campaigns || []);
+      setLoaded(true);
+    });
+  }, []);
+
+  // Fetch audience count when filter changes
+  useEffect(() => {
+    if (view !== "broadcasts" || !showNewCampaign) return;
+    const filter: Record<string, unknown> = { source: campAudienceSource };
+    if (campWithinDays) filter.withinDays = parseInt(campWithinDays);
+    fetch("/api/admin/campaigns/audience", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filter }),
+    })
+      .then((r) => r.json())
+      .then((d) => setAudienceCount(d.count ?? null));
+  }, [view, showNewCampaign, campAudienceSource, campWithinDays]);
+
+  async function saveTemplate() {
+    setSavingTpl(true);
+    try {
+      if (editingTemplate) {
+        await fetch("/api/admin/email-templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "update", templateId: editingTemplate.id, name: tplName, subject: tplSubject, bodyHtml: tplBody }),
+        });
+        setTemplates((prev) => prev.map((t) => t.id === editingTemplate.id ? { ...t, name: tplName, subject: tplSubject, bodyHtml: tplBody, updatedAt: new Date().toISOString() } : t));
+      } else {
+        const res = await fetch("/api/admin/email-templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "create", name: tplName, subject: tplSubject, bodyHtml: tplBody }),
+        });
+        const d = await res.json();
+        if (d.template) setTemplates((prev) => [d.template, ...prev]);
+      }
+      resetTemplateForm();
+    } finally {
+      setSavingTpl(false);
+    }
+  }
+
+  function resetTemplateForm() {
+    setEditingTemplate(null);
+    setTplName("");
+    setTplSubject("");
+    setTplBody("");
+    setShowNewTemplate(false);
+  }
+
+  function editTemplate(tpl: EmailTemplate) {
+    setEditingTemplate(tpl);
+    setTplName(tpl.name);
+    setTplSubject(tpl.subject);
+    setTplBody(tpl.bodyHtml);
+    setShowNewTemplate(true);
+  }
+
+  async function deleteTemplate(id: string) {
+    if (!confirm("Delete this template?")) return;
+    await fetch("/api/admin/email-templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", templateId: id }),
+    });
+    setTemplates((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  async function createCampaign() {
+    if (!campName.trim() || !campTemplateId) return;
+    setCreatingCamp(true);
+    try {
+      const filter: Record<string, unknown> = { source: campAudienceSource };
+      if (campWithinDays) filter.withinDays = parseInt(campWithinDays);
+      const res = await fetch("/api/admin/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          name: campName,
+          templateId: campTemplateId,
+          type: "broadcast",
+          audienceFilter: JSON.stringify(filter),
+        }),
+      });
+      const d = await res.json();
+      if (d.campaignId) {
+        // Reload campaigns
+        const res2 = await fetch("/api/admin/campaigns").then((r) => r.json());
+        setCampaignsList(res2.campaigns || []);
+        setShowNewCampaign(false);
+        setCampName("");
+        setCampTemplateId("");
+        setCampAudienceSource("all");
+        setCampWithinDays("");
+        setAudienceCount(null);
+      }
+    } finally {
+      setCreatingCamp(false);
+    }
+  }
+
+  async function sendCampaign(campaignId: string) {
+    if (!confirm("Send this campaign now? This cannot be undone.")) return;
+    setSendingId(campaignId);
+    try {
+      const res = await fetch("/api/admin/campaigns/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ campaignId }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        alert(`Sent to ${d.sent} recipients${d.failed ? ` (${d.failed} failed)` : ""}`);
+        setCampaignsList((prev) => prev.map((c) => c.id === campaignId ? { ...c, status: "sent", totalSent: d.sent, totalRecipients: d.total, sentAt: new Date().toISOString() } : c));
+      } else {
+        alert(d.error || "Send failed");
+      }
+    } finally {
+      setSendingId(null);
+    }
+  }
+
+  async function createAutomation() {
+    if (!autoName.trim() || !autoTemplateId) return;
+    setCreatingAuto(true);
+    try {
+      await fetch("/api/admin/campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "create",
+          name: autoName,
+          templateId: autoTemplateId,
+          type: "automation",
+          triggerType: autoTrigger,
+          triggerDelayMinutes: parseInt(autoDelay) || 60,
+          audienceFilter: JSON.stringify({ source: autoTrigger === "post_booking" ? "bookings" : "orders" }),
+        }),
+      });
+      const res2 = await fetch("/api/admin/campaigns").then((r) => r.json());
+      setCampaignsList(res2.campaigns || []);
+      setShowNewAutomation(false);
+      setAutoName("");
+      setAutoTemplateId("");
+      setAutoDelay("60");
+    } finally {
+      setCreatingAuto(false);
+    }
+  }
+
+  async function toggleAutomation(id: string, current: string) {
+    const next = current === "active" ? "paused" : "active";
+    setCampaignsList((prev) => prev.map((c) => c.id === id ? { ...c, status: next } : c));
+    await fetch("/api/admin/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "update", campaignId: id, status: next }),
+    });
+  }
+
+  async function deleteCampaign(id: string) {
+    if (!confirm("Delete this campaign?")) return;
+    await fetch("/api/admin/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "delete", campaignId: id }),
+    });
+    setCampaignsList((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  async function previewTemplate(templateId: string) {
+    const res = await fetch("/api/admin/campaigns/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ templateId }),
+    });
+    const d = await res.json();
+    setPreviewHtml(d.html || "");
+  }
+
+  if (!loaded) return <div className="py-20 text-center text-sm text-black/30 dark:text-white/30">Loading…</div>;
+
+  const broadcasts = campaignsList.filter((c) => c.type === "broadcast");
+  const automations = campaignsList.filter((c) => c.type === "automation");
+
+  const inputClass = "h-8 w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 text-xs text-black dark:text-white outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors";
+  const labelClass = "text-[10px] text-black/30 dark:text-white/30 uppercase tracking-wider";
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Sub-nav */}
+      <div className="flex gap-1 p-0.5 rounded-lg bg-black/[0.03] dark:bg-white/[0.03] w-fit">
+        {(["templates", "broadcasts", "automations"] as const).map((v) => (
+          <button
+            key={v}
+            onClick={() => setView(v)}
+            className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
+              view === v ? "bg-white dark:bg-black shadow-sm text-black dark:text-white" : "text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70"
+            }`}
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Templates View ── */}
+      {view === "templates" && (
+        <Section title="Email Templates">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-black/40 dark:text-white/40">
+              Create reusable email templates with variables: <code className="text-[10px] bg-black/5 dark:bg-white/5 px-1 py-0.5 rounded">{"{{name}}"}</code> <code className="text-[10px] bg-black/5 dark:bg-white/5 px-1 py-0.5 rounded">{"{{email}}"}</code> <code className="text-[10px] bg-black/5 dark:bg-white/5 px-1 py-0.5 rounded">{"{{booking_date}}"}</code> <code className="text-[10px] bg-black/5 dark:bg-white/5 px-1 py-0.5 rounded">{"{{product_name}}"}</code>
+            </p>
+
+            {/* Template list */}
+            {templates.map((tpl) => (
+              <div key={tpl.id} className="flex items-center justify-between p-3 rounded-lg border border-black/5 dark:border-white/5">
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-black dark:text-white truncate">{tpl.name}</p>
+                  <p className="text-[10px] text-black/30 dark:text-white/30 mt-0.5 truncate">Subject: {tpl.subject}</p>
+                </div>
+                <div className="flex gap-1.5 shrink-0 ml-2">
+                  <button onClick={() => previewTemplate(tpl.id)} className="text-[10px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors">Preview</button>
+                  <button onClick={() => editTemplate(tpl)} className="text-[10px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white transition-colors">Edit</button>
+                  <button onClick={() => deleteTemplate(tpl.id)} className="text-[10px] text-red-400 hover:text-red-500 transition-colors">Delete</button>
+                </div>
+              </div>
+            ))}
+
+            {/* New/Edit template form */}
+            {showNewTemplate ? (
+              <div className="p-3 rounded-lg border border-dashed border-black/15 dark:border-white/15 flex flex-col gap-2">
+                <input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="Template name" maxLength={100} className={inputClass} />
+                <input value={tplSubject} onChange={(e) => setTplSubject(e.target.value)} placeholder="Email subject line" maxLength={200} className={inputClass} />
+                <div className="flex flex-col gap-1">
+                  <span className={labelClass}>Body (HTML)</span>
+                  <textarea
+                    value={tplBody}
+                    onChange={(e) => setTplBody(e.target.value)}
+                    placeholder="<div>Hi {{name}}, ...</div>"
+                    rows={8}
+                    className="w-full rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-black px-2 py-2 text-xs text-black dark:text-white font-mono outline-none focus:border-black/30 dark:focus:border-white/30 transition-colors resize-y"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveTemplate}
+                    disabled={savingTpl || !tplName.trim() || !tplSubject.trim()}
+                    className="h-7 flex-1 rounded-md bg-black dark:bg-white text-white dark:text-black text-[11px] font-medium transition-opacity hover:opacity-80 disabled:opacity-30"
+                  >
+                    {savingTpl ? "Saving…" : editingTemplate ? "Update template" : "Create template"}
+                  </button>
+                  <button onClick={resetTemplateForm} className="h-7 px-3 rounded-md border border-black/10 dark:border-white/10 text-[11px] text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowNewTemplate(true)}
+                className="h-8 w-full rounded-lg border border-dashed border-black/15 dark:border-white/15 text-[11px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+              >
+                + New template
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Broadcasts View ── */}
+      {view === "broadcasts" && (
+        <Section title="Broadcasts">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-black/40 dark:text-white/40">One-time email blasts to your audience. Pick a template, choose who gets it, and send.</p>
+
+            {/* Campaign list */}
+            {broadcasts.map((camp) => (
+              <div key={camp.id} className="flex items-center justify-between p-3 rounded-lg border border-black/5 dark:border-white/5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-medium text-black dark:text-white truncate">{camp.name}</p>
+                    <span className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full ${
+                      camp.status === "sent" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                      camp.status === "sending" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" :
+                      "bg-black/5 text-black/40 dark:bg-white/5 dark:text-white/40"
+                    }`}>
+                      {camp.status}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-black/30 dark:text-white/30 mt-0.5">
+                    {camp.templateName || "No template"} · {camp.totalSent > 0 ? `${camp.totalSent} sent` : "Not sent"}
+                    {camp.sentAt && ` · ${new Date(camp.sentAt).toLocaleDateString()}`}
+                  </p>
+                </div>
+                <div className="flex gap-1.5 shrink-0 ml-2">
+                  {camp.status === "draft" && (
+                    <button
+                      onClick={() => sendCampaign(camp.id)}
+                      disabled={sendingId === camp.id}
+                      className="text-[10px] font-medium text-emerald-500 hover:text-emerald-600 transition-colors disabled:opacity-50"
+                    >
+                      {sendingId === camp.id ? "Sending…" : "Send"}
+                    </button>
+                  )}
+                  <button onClick={() => deleteCampaign(camp.id)} className="text-[10px] text-red-400 hover:text-red-500 transition-colors">Delete</button>
+                </div>
+              </div>
+            ))}
+
+            {/* New campaign */}
+            {showNewCampaign ? (
+              <div className="p-3 rounded-lg border border-dashed border-black/15 dark:border-white/15 flex flex-col gap-2">
+                <input value={campName} onChange={(e) => setCampName(e.target.value)} placeholder="Campaign name" maxLength={100} className={inputClass} />
+                <div className="flex flex-col gap-1">
+                  <span className={labelClass}>Template</span>
+                  <select
+                    value={campTemplateId}
+                    onChange={(e) => setCampTemplateId(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Select a template…</option>
+                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className={labelClass}>Audience</span>
+                  <div className="flex gap-2 flex-wrap">
+                    {(["all", "subscribers", "bookings", "orders"] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setCampAudienceSource(s)}
+                        className={`h-7 px-3 rounded-md border text-[11px] font-medium capitalize transition-colors ${
+                          campAudienceSource === s ? "border-black/30 dark:border-white/30 text-black dark:text-white" : "border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"
+                        }`}
+                      >
+                        {s === "all" ? "Everyone" : s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <input
+                  value={campWithinDays}
+                  onChange={(e) => setCampWithinDays(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Within last N days (optional, blank = all time)"
+                  className={inputClass}
+                />
+                {audienceCount !== null && (
+                  <p className="text-[11px] text-black/40 dark:text-white/40">
+                    This will be sent to <span className="font-semibold text-black dark:text-white">{audienceCount}</span> {audienceCount === 1 ? "person" : "people"}
+                  </p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={createCampaign}
+                    disabled={creatingCamp || !campName.trim() || !campTemplateId}
+                    className="h-7 flex-1 rounded-md bg-black dark:bg-white text-white dark:text-black text-[11px] font-medium transition-opacity hover:opacity-80 disabled:opacity-30"
+                  >
+                    {creatingCamp ? "Creating…" : "Create draft"}
+                  </button>
+                  <button onClick={() => { setShowNewCampaign(false); setAudienceCount(null); }} className="h-7 px-3 rounded-md border border-black/10 dark:border-white/10 text-[11px] text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowNewCampaign(true)}
+                className="h-8 w-full rounded-lg border border-dashed border-black/15 dark:border-white/15 text-[11px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+              >
+                + New broadcast
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Automations View ── */}
+      {view === "automations" && (
+        <Section title="Automations">
+          <div className="flex flex-col gap-3">
+            <p className="text-xs text-black/40 dark:text-white/40">Automatically send emails after bookings or purchases.</p>
+
+            {/* Automation list */}
+            {automations.map((auto) => (
+              <div key={auto.id} className="flex items-center justify-between p-3 rounded-lg border border-black/5 dark:border-white/5">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-xs font-medium text-black dark:text-white truncate">{auto.name}</p>
+                    <span className={`text-[9px] font-semibold uppercase px-1.5 py-0.5 rounded-full ${
+                      auto.status === "active" ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-black/5 text-black/40 dark:bg-white/5 dark:text-white/40"
+                    }`}>
+                      {auto.status}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-black/30 dark:text-white/30 mt-0.5">
+                    {auto.triggerType === "post_booking" ? "After booking" : "After purchase"} · {auto.triggerDelayMinutes >= 1440 ? `${Math.round(auto.triggerDelayMinutes / 1440)}d` : auto.triggerDelayMinutes >= 60 ? `${Math.round(auto.triggerDelayMinutes / 60)}h` : `${auto.triggerDelayMinutes}m`} delay
+                    {auto.templateName && ` · ${auto.templateName}`}
+                    {auto.totalSent > 0 && ` · ${auto.totalSent} sent`}
+                  </p>
+                </div>
+                <div className="flex gap-1.5 shrink-0 ml-2">
+                  <button
+                    onClick={() => toggleAutomation(auto.id, auto.status)}
+                    className={`text-[10px] font-medium transition-colors ${auto.status === "active" ? "text-amber-500 hover:text-amber-600" : "text-emerald-500 hover:text-emerald-600"}`}
+                  >
+                    {auto.status === "active" ? "Pause" : "Activate"}
+                  </button>
+                  <button onClick={() => deleteCampaign(auto.id)} className="text-[10px] text-red-400 hover:text-red-500 transition-colors">Delete</button>
+                </div>
+              </div>
+            ))}
+
+            {/* New automation */}
+            {showNewAutomation ? (
+              <div className="p-3 rounded-lg border border-dashed border-black/15 dark:border-white/15 flex flex-col gap-2">
+                <input value={autoName} onChange={(e) => setAutoName(e.target.value)} placeholder="Automation name" maxLength={100} className={inputClass} />
+                <div className="flex flex-col gap-1">
+                  <span className={labelClass}>Template</span>
+                  <select value={autoTemplateId} onChange={(e) => setAutoTemplateId(e.target.value)} className={inputClass}>
+                    <option value="">Select a template…</option>
+                    {templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className={labelClass}>Trigger</span>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAutoTrigger("post_booking")}
+                      className={`h-7 px-3 rounded-md border text-[11px] font-medium transition-colors ${autoTrigger === "post_booking" ? "border-black/30 dark:border-white/30 text-black dark:text-white" : "border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"}`}
+                    >
+                      After booking
+                    </button>
+                    <button
+                      onClick={() => setAutoTrigger("post_purchase")}
+                      className={`h-7 px-3 rounded-md border text-[11px] font-medium transition-colors ${autoTrigger === "post_purchase" ? "border-black/30 dark:border-white/30 text-black dark:text-white" : "border-black/10 dark:border-white/10 text-black/30 dark:text-white/30"}`}
+                    >
+                      After purchase
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <span className={labelClass}>Delay (minutes)</span>
+                  <input value={autoDelay} onChange={(e) => setAutoDelay(e.target.value.replace(/\D/g, ""))} placeholder="60" className={inputClass} />
+                  <p className="text-[10px] text-black/25 dark:text-white/25">60 = 1 hour, 1440 = 1 day, 4320 = 3 days</p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={createAutomation}
+                    disabled={creatingAuto || !autoName.trim() || !autoTemplateId}
+                    className="h-7 flex-1 rounded-md bg-black dark:bg-white text-white dark:text-black text-[11px] font-medium transition-opacity hover:opacity-80 disabled:opacity-30"
+                  >
+                    {creatingAuto ? "Creating…" : "Create automation"}
+                  </button>
+                  <button onClick={() => setShowNewAutomation(false)} className="h-7 px-3 rounded-md border border-black/10 dark:border-white/10 text-[11px] text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white transition-colors">Cancel</button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowNewAutomation(true)}
+                className="h-8 w-full rounded-lg border border-dashed border-black/15 dark:border-white/15 text-[11px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white hover:border-black/30 dark:hover:border-white/30 transition-colors"
+              >
+                + New automation
+              </button>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {/* Preview modal */}
+      {previewHtml !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setPreviewHtml(null)}>
+          <div className="bg-white dark:bg-black rounded-xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-3 border-b border-black/5 dark:border-white/5">
+              <span className="text-xs font-medium text-black dark:text-white">Email Preview</span>
+              <button onClick={() => setPreviewHtml(null)} className="text-[11px] text-black/40 dark:text-white/40 hover:text-black dark:hover:text-white">Close</button>
+            </div>
+            <div className="p-4">
+              <iframe
+                srcDoc={previewHtml}
+                className="w-full min-h-[400px] border-0 rounded-md bg-white"
+                sandbox="allow-same-origin"
+                title="Email preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

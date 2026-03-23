@@ -1,6 +1,187 @@
 import { Resend } from "resend";
+import { db } from "@/db";
+import { subscribers, bookings, orders, unsubscribes, campaignSends, campaigns } from "@/db/schema";
+import { eq, and, gte, notInArray, sql } from "drizzle-orm";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// ── Campaign utilities ──────────────────────────────────────────────────────
+
+/** Replace {{var}} placeholders with values */
+export function interpolateTemplate(
+  html: string,
+  vars: Record<string, string>,
+): string {
+  let result = html.replace(/\{\{(\w+)\}\}/g, (_, key) => vars[key] ?? "");
+  // Auto-append unsubscribe footer if not already present
+  if (!html.includes("{{unsubscribe_url}}") && vars.unsubscribe_url) {
+    result += `<div style="margin-top:32px;padding-top:16px;border-top:1px solid #eee;text-align:center"><a href="${vars.unsubscribe_url}" style="color:#888;font-size:12px;text-decoration:underline">Unsubscribe</a></div>`;
+  }
+  return result;
+}
+
+type AudienceFilter = {
+  source: "all" | "subscribers" | "bookings" | "orders";
+  withinDays?: number;
+};
+
+type Recipient = { email: string; name: string };
+
+/** Resolve deduplicated recipients for a campaign audience filter */
+export async function resolveAudience(
+  profileId: number,
+  filter: AudienceFilter,
+): Promise<Recipient[]> {
+  const seen = new Map<string, string>(); // email -> name
+
+  const cutoff = filter.withinDays
+    ? new Date(Date.now() - filter.withinDays * 24 * 60 * 60 * 1000)
+    : null;
+
+  // Subscribers
+  if (filter.source === "all" || filter.source === "subscribers") {
+    const conds = [eq(subscribers.profileId, profileId)];
+    if (cutoff) conds.push(gte(subscribers.subscribedAt, cutoff));
+    const rows = await db
+      .select({ email: subscribers.email, name: subscribers.name })
+      .from(subscribers)
+      .where(and(...conds));
+    for (const r of rows) {
+      if (!seen.has(r.email)) seen.set(r.email, r.name || "");
+    }
+  }
+
+  // Booking guests
+  if (filter.source === "all" || filter.source === "bookings") {
+    const conds = [eq(bookings.profileId, profileId)];
+    if (cutoff) conds.push(gte(bookings.createdAt, cutoff));
+    const rows = await db
+      .select({ email: bookings.guestEmail, name: bookings.guestName })
+      .from(bookings)
+      .where(and(...conds));
+    for (const r of rows) {
+      if (!seen.has(r.email)) seen.set(r.email, r.name || "");
+    }
+  }
+
+  // Store customers
+  if (filter.source === "all" || filter.source === "orders") {
+    const conds = [eq(orders.profileId, profileId), eq(orders.status, "paid")];
+    if (cutoff) conds.push(gte(orders.createdAt, cutoff));
+    const rows = await db
+      .select({ email: orders.guestEmail, name: orders.guestName })
+      .from(orders)
+      .where(and(...conds));
+    for (const r of rows) {
+      if (!seen.has(r.email)) seen.set(r.email, r.name || "");
+    }
+  }
+
+  // Exclude unsubscribes
+  const unsubs = await db
+    .select({ email: unsubscribes.email })
+    .from(unsubscribes)
+    .where(eq(unsubscribes.profileId, profileId));
+  const unsubSet = new Set(unsubs.map((u) => u.email));
+
+  const recipients: Recipient[] = [];
+  for (const [email, name] of seen) {
+    if (!unsubSet.has(email)) {
+      recipients.push({ email, name });
+    }
+  }
+
+  return recipients;
+}
+
+/** Send campaign emails in batches of 100 via Resend */
+export async function sendCampaignBatch(
+  campaignId: string,
+  profileId: number,
+  recipients: Recipient[],
+  subject: string,
+  bodyHtml: string,
+  username: string,
+): Promise<{ sent: number; failed: number }> {
+  if (!process.env.RESEND_API_KEY) return { sent: 0, failed: 0 };
+
+  let totalSent = 0;
+  let totalFailed = 0;
+  const chunkSize = 100;
+
+  for (let i = 0; i < recipients.length; i += chunkSize) {
+    const chunk = recipients.slice(i, i + chunkSize);
+
+    const emailBatch = chunk.map((r) => {
+      const unsubscribeUrl = `${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/unsubscribe/${username}?email=${encodeURIComponent(r.email)}`;
+      const html = interpolateTemplate(bodyHtml, {
+        name: r.name || "there",
+        email: r.email,
+        unsubscribe_url: unsubscribeUrl,
+      });
+      const subj = interpolateTemplate(subject, {
+        name: r.name || "there",
+        email: r.email,
+      });
+      return {
+        from: "Newsletter <bookings@resend.dev>",
+        to: r.email,
+        subject: subj,
+        html,
+      };
+    });
+
+    try {
+      const result = await (resend.batch as any).send(emailBatch);
+      const ids: string[] = result?.data?.data?.map((d: any) => d.id) || [];
+
+      // Update send rows
+      for (let j = 0; j < chunk.length; j++) {
+        await db
+          .update(campaignSends)
+          .set({
+            status: "sent",
+            resendEmailId: ids[j] || null,
+            sentAt: new Date(),
+          })
+          .where(
+            and(
+              eq(campaignSends.campaignId, campaignId),
+              eq(campaignSends.recipientEmail, chunk[j].email),
+            ),
+          );
+      }
+      totalSent += chunk.length;
+    } catch (err) {
+      console.error("Campaign batch send failed:", err);
+      // Mark chunk as failed
+      for (const r of chunk) {
+        await db
+          .update(campaignSends)
+          .set({ status: "failed" })
+          .where(
+            and(
+              eq(campaignSends.campaignId, campaignId),
+              eq(campaignSends.recipientEmail, r.email),
+            ),
+          );
+      }
+      totalFailed += chunk.length;
+    }
+  }
+
+  // Update campaign totals
+  await db
+    .update(campaigns)
+    .set({
+      totalSent,
+      status: "sent",
+      sentAt: new Date(),
+    })
+    .where(eq(campaigns.id, campaignId));
+
+  return { sent: totalSent, failed: totalFailed };
+}
 
 export type BookingEmailData = {
   guestName: string;

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { db } from "@/db";
-import { orders, products, profiles } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { orders, products, profiles, campaigns, emailTemplates, campaignSends, unsubscribes } from "@/db/schema";
+import { eq, and } from "drizzle-orm";
 import { Resend } from "resend";
 import { fireWebhook } from "@/lib/webhook";
+import { interpolateTemplate } from "@/lib/email";
 
 export async function POST(req: Request) {
   if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
@@ -52,6 +53,52 @@ export async function POST(req: Request) {
           guestEmail: session.customer_details?.email || "",
           guestName: session.customer_details?.name || "",
         });
+      }
+
+      // Trigger post-purchase email automations
+      if (profile && session.customer_details?.email) {
+        const guestEmail = session.customer_details.email.toLowerCase();
+        const guestName = session.customer_details.name || "";
+        try {
+          const activeAutos = await db
+            .select({ id: campaigns.id, templateId: campaigns.templateId, triggerDelayMinutes: campaigns.triggerDelayMinutes })
+            .from(campaigns)
+            .where(and(eq(campaigns.profileId, profile.id), eq(campaigns.type, "automation"), eq(campaigns.triggerType, "post_purchase"), eq(campaigns.status, "active")));
+
+          if (activeAutos.length > 0) {
+            const unsub = await db.select().from(unsubscribes).where(and(eq(unsubscribes.profileId, profile.id), eq(unsubscribes.email, guestEmail))).limit(1);
+            if (unsub.length === 0) {
+              const resendAuto = new Resend(process.env.RESEND_API_KEY);
+              for (const auto of activeAutos) {
+                if (!auto.templateId) continue;
+                const existing = await db.select().from(campaignSends).where(and(eq(campaignSends.campaignId, auto.id), eq(campaignSends.recipientEmail, guestEmail))).limit(1);
+                if (existing.length > 0) continue;
+
+                const template = await db.query.emailTemplates.findFirst({ where: eq(emailTemplates.id, auto.templateId) });
+                if (!template) continue;
+
+                const unsubscribeUrl = `${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/unsubscribe/${profile.username}?email=${encodeURIComponent(guestEmail)}`;
+                const vars = { name: guestName, email: guestEmail, product_name: product?.title || "your purchase", unsubscribe_url: unsubscribeUrl };
+                const html = interpolateTemplate(template.bodyHtml, vars);
+                const subj = interpolateTemplate(template.subject, vars);
+
+                const sendAt = new Date(Date.now() + auto.triggerDelayMinutes * 60 * 1000);
+                const sendId = crypto.randomUUID();
+                try {
+                  const useScheduled = auto.triggerDelayMinutes <= 72 * 60 && auto.triggerDelayMinutes > 0;
+                  const result = await resendAuto.emails.send({
+                    from: "Newsletter <bookings@resend.dev>",
+                    to: guestEmail,
+                    subject: subj,
+                    html,
+                    ...(useScheduled ? { scheduledAt: sendAt.toISOString() } : {}),
+                  } as Parameters<typeof resendAuto.emails.send>[0]);
+                  await db.insert(campaignSends).values({ id: sendId, campaignId: auto.id, profileId: profile.id, recipientEmail: guestEmail, recipientName: guestName, status: "sent", resendEmailId: (result as any)?.data?.id ?? null, sentAt: new Date() });
+                } catch { await db.insert(campaignSends).values({ id: sendId, campaignId: auto.id, profileId: profile.id, recipientEmail: guestEmail, recipientName: guestName, status: "failed" }); }
+              }
+            }
+          }
+        } catch (err) { console.error("Post-purchase automation error:", err); }
       }
 
       if (product?.fileUrl && session.customer_details?.email && process.env.RESEND_API_KEY) {

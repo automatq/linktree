@@ -1,14 +1,15 @@
 import { NextResponse, after } from "next/server";
 import { db } from "@/db";
-import { profiles, availability, bookings, groups, groupMembers, blockedDates, pendingReminders } from "@/db/schema";
+import { profiles, availability, bookings, groups, groupMembers, blockedDates, pendingReminders, campaigns, emailTemplates, campaignSends, unsubscribes } from "@/db/schema";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { generateSlots, generateGroupSlots, pickGroupMember } from "@/lib/slots";
 import type { GroupMemberSlotInfo } from "@/lib/slots";
-import { sendGuestConfirmation, sendHostNotification, sendGuestReminder, sendHostReminder } from "@/lib/email";
+import { sendGuestConfirmation, sendHostNotification, sendGuestReminder, sendHostReminder, interpolateTemplate } from "@/lib/email";
 import type { BookingEmailData } from "@/lib/email";
 import { sendGuestConfirmationSms, sendHostNotificationSms, sendGuestReminderSms, sendHostReminderSms } from "@/lib/sms";
 import { fireWebhook } from "@/lib/webhook";
 import { isRateLimited } from "@/lib/rate-limit";
+import { Resend } from "resend";
 
 function genId() {
   return crypto.randomUUID();
@@ -316,6 +317,80 @@ export async function POST(
       })
     );
   }
+
+  // Trigger post-booking email automations
+  after(async () => {
+    try {
+      const activeAutos = await db
+        .select({ id: campaigns.id, templateId: campaigns.templateId, triggerDelayMinutes: campaigns.triggerDelayMinutes })
+        .from(campaigns)
+        .where(and(eq(campaigns.profileId, profile.id), eq(campaigns.type, "automation"), eq(campaigns.triggerType, "post_booking"), eq(campaigns.status, "active")));
+
+      if (activeAutos.length === 0) return;
+
+      // Check if guest is unsubscribed
+      const unsub = await db.select().from(unsubscribes).where(and(eq(unsubscribes.profileId, profile.id), eq(unsubscribes.email, guestEmail.toLowerCase()))).limit(1);
+      if (unsub.length > 0) return;
+
+      const resendClient = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+      if (!resendClient) return;
+
+      for (const auto of activeAutos) {
+        if (!auto.templateId) continue;
+
+        // Check dedup — don't send same automation to same email twice
+        const existing = await db.select().from(campaignSends).where(and(eq(campaignSends.campaignId, auto.id), eq(campaignSends.recipientEmail, guestEmail.toLowerCase()))).limit(1);
+        if (existing.length > 0) continue;
+
+        const template = await db.query.emailTemplates.findFirst({ where: eq(emailTemplates.id, auto.templateId) });
+        if (!template) continue;
+
+        const unsubscribeUrl = `${process.env.NEXT_PUBLIC_BASE_URL || ""}/api/unsubscribe/${profile.username}?email=${encodeURIComponent(guestEmail)}`;
+        const vars = { name: guestName, email: guestEmail, booking_date: startsAt.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" }), booking_title: profile.bookingTitle || "Booking", unsubscribe_url: unsubscribeUrl };
+        const html = interpolateTemplate(template.bodyHtml, vars);
+        const subj = interpolateTemplate(template.subject, vars);
+
+        const sendAt = new Date(Date.now() + auto.triggerDelayMinutes * 60 * 1000);
+        const sendId = crypto.randomUUID();
+
+        try {
+          const useScheduled = auto.triggerDelayMinutes <= 72 * 60 && auto.triggerDelayMinutes > 0;
+          const result = await resendClient.emails.send({
+            from: "Newsletter <bookings@resend.dev>",
+            to: guestEmail,
+            subject: subj,
+            html,
+            ...(useScheduled ? { scheduledAt: sendAt.toISOString() } : {}),
+          } as Parameters<typeof resendClient.emails.send>[0]);
+
+          await db.insert(campaignSends).values({
+            id: sendId,
+            campaignId: auto.id,
+            profileId: profile.id,
+            recipientEmail: guestEmail.toLowerCase(),
+            recipientName: guestName,
+            status: "sent",
+            resendEmailId: (result as any)?.data?.id ?? null,
+            sentAt: new Date(),
+          });
+
+          await db.update(campaigns).set({ totalSent: auto.triggerDelayMinutes + 1 }).where(eq(campaigns.id, auto.id));
+        } catch (err) {
+          console.error("Automation send failed:", err);
+          await db.insert(campaignSends).values({
+            id: sendId,
+            campaignId: auto.id,
+            profileId: profile.id,
+            recipientEmail: guestEmail.toLowerCase(),
+            recipientName: guestName,
+            status: "failed",
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Automation trigger error:", err);
+    }
+  });
 
   return NextResponse.json({ ok: true, id });
 
